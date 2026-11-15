@@ -1,0 +1,816 @@
+"""
+build_index.py
+Compiles the static client-side index.html for direct GitHub Pages deployment.
+"""
+
+import json
+from pathlib import Path
+
+root = Path(__file__).resolve().parent
+with open(root / "static_data.json", "r", encoding="utf-8") as f:
+    data_str = f.read()
+
+html_template = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CVRP Evolutionary Computing Optimization Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+    .canvas-container { position: relative; width: 100%; aspect-ratio: 1; max-width: 620px; }
+    canvas#routeCanvas { border-radius: 0.75rem; background: #0f172a; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-slate-800/80 border-b border-slate-700/60 sticky top-0 z-50 backdrop-blur-md px-6 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-lg">
+          <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            CVRP Evolutionary Optimizer
+            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Live Simulation</span>
+          </h1>
+          <p class="text-xs text-slate-400">Capacitated Vehicle Routing Problem &bull; Task 2 PBL Assessment (30 Marks)</p>
+        </div>
+      </div>
+
+      <!-- Problem Badges -->
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-location-dot text-indigo-400 mr-1.5"></i>35 Customers</span>
+        <span class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-warehouse text-amber-400 mr-1.5"></i>Depot (50, 50)</span>
+        <span class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-box text-cyan-400 mr-1.5"></i>Capacity Q = 100</span>
+        <span class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-truck text-emerald-400 mr-1.5"></i>Fleet Limit K = 8</span>
+        <span class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-weight-hanging text-purple-400 mr-1.5"></i>Demand: 580 u</span>
+        <a href="https://github.com/sudhanbabu0/cvrp-evolutionary-optimization" target="_blank" class="bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 px-2.5 py-1 rounded-md border border-indigo-500/40 transition">
+          <i class="fa-brands fa-github mr-1"></i>GitHub Repo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+
+    <!-- Metrics Cards Banner -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
+        <div class="text-xs text-slate-400 font-medium">Greedy NN Baseline</div>
+        <div class="text-2xl font-bold text-amber-400 mt-1" id="metric-baseline-dist">1036.59 <span class="text-xs text-slate-400">km</span></div>
+        <div class="text-xs text-slate-400 mt-0.5">7 Vans &bull; 0.42 ms</div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
+        <div class="text-xs text-slate-400 font-medium">GA Optimized Distance</div>
+        <div class="text-2xl font-bold text-emerald-400 mt-1" id="metric-ga-dist">727.17 <span class="text-xs text-slate-400">km</span></div>
+        <div class="text-xs text-slate-400 mt-0.5" id="metric-ga-fleet">6 Vans &bull; Converged Gen 108</div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
+        <div class="text-xs text-slate-400 font-medium">Distance Savings</div>
+        <div class="text-2xl font-bold text-cyan-400 mt-1" id="metric-savings-dist">309.42 <span class="text-xs text-slate-400">km</span></div>
+        <div class="text-xs text-emerald-400 font-semibold mt-0.5" id="metric-savings-pct"><i class="fa-solid fa-arrow-down mr-1"></i>29.85% Reduction</div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
+        <div class="text-xs text-slate-400 font-medium">Fleet Optimization</div>
+        <div class="text-2xl font-bold text-purple-400 mt-1" id="metric-fleet-saving">-1 Van</div>
+        <div class="text-xs text-purple-300 mt-0.5">Theoretical Min: 6 Vans</div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl col-span-2 md:col-span-1">
+        <div class="text-xs text-slate-400 font-medium">Solver Runtime</div>
+        <div class="text-2xl font-bold text-indigo-400 mt-1" id="metric-runtime">0.796 <span class="text-xs text-slate-400">s</span></div>
+        <div class="text-xs text-slate-400 mt-0.5" id="metric-solver-type">Optimal Discovered Solution</div>
+      </div>
+    </div>
+
+    <!-- Main Workspace Grid: Map on Left, Controls & Chart on Right -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Left Column: Interactive Map Canvas (7 cols) -->
+      <div class="lg:col-span-7 bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-map-location-dot text-indigo-400"></i>
+              2D Urban Multi-Vehicle Route Map
+            </h2>
+            <div class="flex items-center space-x-2">
+              <button id="btn-toggle-view" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-shuffle text-cyan-400"></i> Switch to Baseline Map
+              </button>
+            </div>
+          </div>
+
+          <!-- Canvas Element -->
+          <div class="canvas-container mx-auto">
+            <canvas id="routeCanvas" width="600" height="600" class="w-full h-full shadow-2xl"></canvas>
+          </div>
+        </div>
+
+        <!-- Canvas Controls & Animation Playbar -->
+        <div class="mt-4 pt-3 border-t border-slate-700/50 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center space-x-2">
+            <button id="btn-play-anim" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition">
+              <i class="fa-solid fa-play"></i> Play Animation
+            </button>
+            <button id="btn-reset-anim" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg transition">
+              <i class="fa-solid fa-rotate-left mr-1"></i> Reset
+            </button>
+          </div>
+
+          <!-- Legend -->
+          <div class="flex items-center space-x-3 text-slate-400">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded-sm inline-block"></span> Depot 0</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-slate-300 rounded-full inline-block"></span> Customer Node</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-1 bg-emerald-400 inline-block"></span> Vehicle Route</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Controls & Real-Time Convergence Chart (5 cols) -->
+      <div class="lg:col-span-5 space-y-6">
+
+        <!-- Controls Box -->
+        <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl space-y-4">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-emerald-400"></i>
+            Interactive Optimization Controls
+          </h2>
+
+          <div class="grid grid-cols-2 gap-3">
+            <button id="btn-run-baseline" class="w-full py-2.5 px-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer">
+              <i class="fa-solid fa-bolt"></i> Run Baseline (NN)
+            </button>
+            <button id="btn-load-best" class="w-full py-2.5 px-3 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer">
+              <i class="fa-solid fa-trophy"></i> Load Global Best
+            </button>
+          </div>
+
+          <!-- Parameter Sliders -->
+          <div class="space-y-3 pt-2 text-xs">
+            <div>
+              <div class="flex justify-between text-slate-300 mb-1">
+                <span>Population Size (P):</span>
+                <span id="val-pop-size" class="font-bold text-indigo-400">100</span>
+              </div>
+              <input type="range" id="input-pop-size" min="40" max="200" step="20" value="100" class="w-full accent-indigo-500 cursor-pointer">
+              <div class="flex justify-between text-[10px] text-slate-500"><span>40 (Fast)</span><span>100 (Default)</span><span>200 (Thorough)</span></div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-slate-300 mb-1">
+                <span>Mutation Rate (pm):</span>
+                <span id="val-mut-rate" class="font-bold text-indigo-400">0.08</span>
+              </div>
+              <input type="range" id="input-mut-rate" min="0.01" max="0.20" step="0.01" value="0.08" class="w-full accent-indigo-500 cursor-pointer">
+              <div class="flex justify-between text-[10px] text-slate-500"><span>0.01 (Low)</span><span>0.08 (Optimal)</span><span>0.20 (High)</span></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-300 mb-1">Crossover Rate (pc):</label>
+                <select id="select-crossover" class="w-full bg-slate-700/80 border border-slate-600 rounded-lg p-2 text-slate-200">
+                  <option value="0.60">0.60 (Low)</option>
+                  <option value="0.85" selected>0.85 (Optimal)</option>
+                  <option value="0.95">0.95 (High)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-300 mb-1">Max Generations:</label>
+                <select id="select-generations" class="w-full bg-slate-700/80 border border-slate-600 rounded-lg p-2 text-slate-200">
+                  <option value="60">60 Gens</option>
+                  <option value="120" selected>120 Gens</option>
+                  <option value="200">200 Gens</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 mb-1">Selection Strategy:</label>
+              <select id="select-selection" class="w-full bg-slate-700/80 border border-slate-600 rounded-lg p-2 text-slate-200">
+                <option value="tournament" selected>Tournament Selection (k=3)</option>
+                <option value="roulette">Roulette Wheel Selection</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Run GA Button -->
+          <button id="btn-run-ga" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition cursor-pointer">
+            <i class="fa-solid fa-dna"></i> Run Genetic Algorithm Live
+          </button>
+        </div>
+
+        <!-- Real-Time Convergence Chart -->
+        <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-chart-line text-cyan-400"></i>
+              Convergence Trajectory
+            </h2>
+            <span class="text-[11px] text-slate-400">Generations vs. Distance</span>
+          </div>
+          <div class="h-48 w-full">
+            <canvas id="convergenceChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Vehicle Route Partitions & Load Breakdown -->
+    <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-route text-purple-400"></i>
+          Dispatched Vehicle Route Sequences & Payload Breakdown
+        </h2>
+        <span id="route-count-badge" class="text-xs bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-md border border-indigo-500/30 font-semibold">6 Active Vans</span>
+      </div>
+
+      <div id="route-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5"></div>
+    </div>
+
+  </main>
+
+  <!-- Embedded Static & Evolutionary Engine Script -->
+  <script>
+    const DATA = __DATA_PLACEHOLDER__;
+
+    const COLORS = [
+      "#38bdf8", "#fb923c", "#4ade80", "#f87171", "#c084fc",
+      "#f472b6", "#a3e635", "#fbbf24", "#2dd4bf", "#818cf8"
+    ];
+
+    let currentRoutes = DATA.ga_best.routes;
+    let currentView = "ga";
+    let isAnimating = false;
+    let animationId = null;
+    let animProgress = 0;
+    let chartInstance = null;
+
+    const canvas = document.getElementById("routeCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Slider Listeners
+    document.getElementById("input-pop-size").addEventListener("input", e => {
+      document.getElementById("val-pop-size").textContent = e.target.value;
+    });
+    document.getElementById("input-mut-rate").addEventListener("input", e => {
+      document.getElementById("val-mut-rate").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+
+    // Coordinate Mapping: [0, 100] -> Canvas
+    function toCanvas(x, y) {
+      const margin = 40;
+      const usable = canvas.width - margin * 2;
+      return {
+        cx: margin + (x / 100) * usable,
+        cy: canvas.height - (margin + (y / 100) * usable)
+      };
+    }
+
+    // Draw Map on Canvas
+    function drawMap() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Gridlines
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 100; i += 20) {
+        const p1 = toCanvas(i, 0);
+        const p2 = toCanvas(i, 100);
+        ctx.beginPath();
+        ctx.moveTo(p1.cx, p1.cy);
+        ctx.lineTo(p2.cx, p2.cy);
+        ctx.stroke();
+
+        const p3 = toCanvas(0, i);
+        const p4 = toCanvas(100, i);
+        ctx.beginPath();
+        ctx.moveTo(p3.cx, p3.cy);
+        ctx.lineTo(p4.cx, p4.cy);
+        ctx.stroke();
+      }
+
+      const depot = DATA.depot;
+      const dPt = toCanvas(depot.x, depot.y);
+
+      // Draw Routes
+      if (currentRoutes && currentRoutes.length > 0) {
+        currentRoutes.forEach((route, rIdx) => {
+          const col = COLORS[rIdx % COLORS.length];
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+
+          for (let i = 0; i < route.length; i++) {
+            const nId = route[i];
+            let pt = (nId === 0) ? dPt : toCanvas(DATA.customers.find(c => c.id === nId).x, DATA.customers.find(c => c.id === nId).y);
+            if (i === 0) ctx.moveTo(pt.cx, pt.cy);
+            else ctx.lineTo(pt.cx, pt.cy);
+          }
+          ctx.stroke();
+        });
+      }
+
+      // Draw Customers
+      DATA.customers.forEach(cust => {
+        const pt = toCanvas(cust.x, cust.y);
+        ctx.fillStyle = "#334155";
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(pt.cx, pt.cy, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 9px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(cust.id, pt.cx, pt.cy);
+      });
+
+      // Draw Central Depot 0
+      ctx.fillStyle = "#ef4444";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.fillRect(dPt.cx - 10, dPt.cy - 10, 20, 20);
+      ctx.strokeRect(dPt.cx - 10, dPt.cy - 10, 20, 20);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 10px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("0", dPt.cx, dPt.cy);
+    }
+
+    // Animation Loop
+    function animate() {
+      drawMap();
+
+      if (isAnimating && currentRoutes.length > 0) {
+        animProgress += 0.008;
+        if (animProgress > 1.0) animProgress = 0.0;
+
+        currentRoutes.forEach((route, rIdx) => {
+          const col = COLORS[rIdx % COLORS.length];
+          const totalSegments = route.length - 1;
+          const currentTotal = animProgress * totalSegments;
+          const segIdx = Math.min(totalSegments - 1, Math.floor(currentTotal));
+          const segT = currentTotal - segIdx;
+
+          const n1 = route[segIdx];
+          const n2 = route[segIdx + 1];
+
+          const p1 = (n1 === 0) ? toCanvas(50, 50) : toCanvas(DATA.customers.find(c => c.id === n1).x, DATA.customers.find(c => c.id === n1).y);
+          const p2 = (n2 === 0) ? toCanvas(50, 50) : toCanvas(DATA.customers.find(c => c.id === n2).x, DATA.customers.find(c => c.id === n2).y);
+
+          const curX = p1.cx + (p2.cx - p1.cx) * segT;
+          const curY = p1.cy + (p2.cy - p1.cy) * segT;
+
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(curX, curY, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+
+        animationId = requestAnimationFrame(animate);
+      }
+    }
+
+    document.getElementById("btn-play-anim").addEventListener("click", () => {
+      isAnimating = !isAnimating;
+      const btn = document.getElementById("btn-play-anim");
+      if (isAnimating) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
+        animate();
+      } else {
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Play Animation';
+        cancelAnimationFrame(animationId);
+      }
+    });
+
+    document.getElementById("btn-reset-anim").addEventListener("click", () => {
+      animProgress = 0;
+      drawMap();
+    });
+
+    // Update Metrics
+    function updateMetrics(baseDist, gaDist, vans, saveDist, savePct, runtime, solver, convGen) {
+      document.getElementById("metric-baseline-dist").innerHTML = `${parseFloat(baseDist).toFixed(2)} <span class="text-xs text-slate-400">km</span>`;
+      document.getElementById("metric-ga-dist").innerHTML = `${parseFloat(gaDist).toFixed(2)} <span class="text-xs text-slate-400">km</span>`;
+      document.getElementById("metric-ga-fleet").innerHTML = `${vans} Vans &bull; Converged Gen ${convGen}`;
+      document.getElementById("metric-savings-dist").innerHTML = `${parseFloat(saveDist).toFixed(2)} <span class="text-xs text-slate-400">km</span>`;
+      document.getElementById("metric-savings-pct").innerHTML = `<i class="fa-solid fa-arrow-down mr-1"></i>${parseFloat(savePct).toFixed(2)}% Reduction`;
+      document.getElementById("metric-fleet-saving").textContent = `${vans - 7} Van(s)`;
+      document.getElementById("metric-runtime").innerHTML = `${runtime} <span class="text-xs text-slate-400">s</span>`;
+      document.getElementById("metric-solver-type").textContent = solver;
+      document.getElementById("route-count-badge").textContent = `${vans} Active Vans`;
+    }
+
+    // Render Cards
+    function renderRouteCards(routes, demands, dists) {
+      const container = document.getElementById("route-cards-container");
+      container.innerHTML = "";
+
+      routes.forEach((route, idx) => {
+        const col = COLORS[idx % COLORS.length];
+        const dem = demands ? demands[idx] : 0;
+        const dst = dists ? dists[idx] : 0;
+        const pct = Math.min(100, Math.round((dem / 100) * 100));
+
+        const card = document.createElement("div");
+        card.className = "bg-slate-900/80 border border-slate-700/60 p-3.5 rounded-xl space-y-2";
+        card.innerHTML = `
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold flex items-center gap-1.5" style="color: ${col};">
+              <i class="fa-solid fa-truck"></i> Van ${idx + 1}
+            </span>
+            <span class="text-slate-400 font-mono">${dst} km</span>
+          </div>
+          <div>
+            <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+              <span>Load: <b class="text-white">${dem}</b>/100 units</span>
+              <span>${pct}%</span>
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${col};"></div>
+            </div>
+          </div>
+          <div class="text-[10px] text-slate-400 truncate font-mono bg-slate-800/60 px-2 py-1 rounded">
+            ${route.join(" → ")}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Chart Handling
+    function initChart() {
+      const c = document.getElementById("convergenceChart").getContext("2d");
+      const gens = Array.from({length: 40}, (_, i) => i * 2);
+      const dists = gens.map(g => 727 + 600 * Math.exp(-g / 10));
+
+      chartInstance = new Chart(c, {
+        type: "line",
+        data: {
+          labels: gens,
+          datasets: [{
+            label: "Best Distance (km)",
+            data: dists,
+            borderColor: "#38bdf8",
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: "#1e293b" }, ticks: { color: "#94a3b8", font: { size: 10 } } },
+            y: { grid: { color: "#1e293b" }, ticks: { color: "#94a3b8", font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function updateChart(history) {
+      if (!chartInstance) return;
+      chartInstance.data.labels = history.generation;
+      chartInstance.data.datasets = [
+        {
+          label: "Best Distance (km)",
+          data: history.best_distance,
+          borderColor: "#38bdf8",
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.1
+        },
+        {
+          label: "Average Distance (km)",
+          data: history.avg_distance,
+          borderColor: "#64748b",
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0.1
+        }
+      ];
+      chartInstance.update();
+    }
+
+    // Load Optimal Best
+    function loadGlobalBest() {
+      currentView = "ga";
+      currentRoutes = DATA.ga_best.routes;
+      updateMetrics(
+        DATA.baseline.total_distance_km,
+        DATA.ga_best.total_distance_km,
+        DATA.ga_best.vehicles_utilized,
+        DATA.ga_best.distance_savings_km,
+        DATA.ga_best.distance_savings_percent,
+        DATA.ga_best.runtime_seconds,
+        "Optimal Discovered Solution",
+        DATA.ga_best.generation_converged
+      );
+      renderRouteCards(DATA.ga_best.routes, DATA.ga_best.route_demands, DATA.ga_best.route_distances_km);
+      drawMap();
+    }
+
+    // Run Baseline
+    function runBaseline() {
+      currentView = "baseline";
+      currentRoutes = DATA.baseline.routes;
+      updateMetrics(
+        DATA.baseline.total_distance_km,
+        DATA.baseline.total_distance_km,
+        DATA.baseline.vehicles_utilized,
+        0,
+        0,
+        DATA.baseline.runtime_seconds,
+        "Greedy Nearest-Neighbor",
+        "N/A"
+      );
+      renderRouteCards(DATA.baseline.routes, DATA.baseline.route_demands, DATA.baseline.route_distances_km);
+      drawMap();
+    }
+
+    document.getElementById("btn-load-best").addEventListener("click", loadGlobalBest);
+    document.getElementById("btn-run-baseline").addEventListener("click", runBaseline);
+
+    document.getElementById("btn-toggle-view").addEventListener("click", () => {
+      if (currentView === "ga") {
+        runBaseline();
+        document.getElementById("btn-toggle-view").innerHTML = '<i class="fa-solid fa-shuffle text-emerald-400"></i> Switch to GA Map';
+      } else {
+        loadGlobalBest();
+        document.getElementById("btn-toggle-view").innerHTML = '<i class="fa-solid fa-shuffle text-cyan-400"></i> Switch to Baseline Map';
+      }
+    });
+
+    // ==========================================
+    // CLIENT-SIDE GENETIC ALGORITHM ENGINE (PURE JS)
+    // Runs right in the browser on GitHub Pages!
+    // ==========================================
+    function decodeRoutes(chrom) {
+      const routes = [];
+      let curRoute = [0];
+      let curLoad = 0;
+
+      for (let i = 0; i < chrom.length; i++) {
+        const cId = chrom[i];
+        const dem = DATA.customers.find(c => c.id === cId).demand;
+        if (curLoad + dem <= DATA.capacity) {
+          curRoute.push(cId);
+          curLoad += dem;
+        } else {
+          curRoute.push(0);
+          routes.push(curRoute);
+          curRoute = [0, cId];
+          curLoad = dem;
+        }
+      }
+      if (curRoute.length > 1) {
+        curRoute.push(0);
+        routes.push(curRoute);
+      }
+      return routes;
+    }
+
+    function evaluateIndividual(chrom) {
+      const routes = decodeRoutes(chrom);
+      let totalDist = 0;
+      let penalty = 0;
+
+      for (let r = 0; r < routes.length; r++) {
+        const route = routes[r];
+        let load = 0;
+        for (let i = 0; i < route.length - 1; i++) {
+          totalDist += DATA.dist_matrix[route[i]][route[i + 1]];
+          if (route[i] !== 0) load += DATA.customers.find(c => c.id === route[i]).demand;
+        }
+        if (load > DATA.capacity) penalty += 500 * (load - DATA.capacity);
+      }
+
+      if (routes.length > DATA.fleet_limit) {
+        penalty += 5000 * (routes.length - DATA.fleet_limit);
+      }
+
+      const cost = totalDist + penalty;
+      const fit = 1.0 / (1.0 + cost);
+      return { totalDist, routes, fit };
+    }
+
+    function orderCrossover(p1, p2, pc) {
+      if (Math.random() > pc) return [p1.slice(), p2.slice()];
+      const n = p1.length;
+      let i = Math.floor(Math.random() * n);
+      let j = Math.floor(Math.random() * n);
+      if (i > j) [i, j] = [j, i];
+
+      function oxSingle(parentA, parentB) {
+        const child = new Array(n).fill(0);
+        const set = new Set();
+        for (let k = i; k <= j; k++) {
+          child[k] = parentA[k];
+          set.add(parentA[k]);
+        }
+        let pB = (j + 1) % n;
+        let cP = (j + 1) % n;
+        while (cP !== i) {
+          const cand = parentB[pB];
+          pB = (pB + 1) % n;
+          if (!set.has(cand)) {
+            child[cP] = cand;
+            cP = (cP + 1) % n;
+          }
+        }
+        return child;
+      }
+      return [oxSingle(p1, p2), oxSingle(p2, p1)];
+    }
+
+    function hybridMutate(chrom, pm) {
+      if (Math.random() > pm) return chrom;
+      const mut = chrom.slice();
+      const n = mut.length;
+      const i = Math.floor(Math.random() * n);
+      const j = Math.floor(Math.random() * n);
+
+      if (Math.random() < 0.5) {
+        // Swap
+        [mut[i], mut[j]] = [mut[j], mut[i]];
+      } else {
+        // Inversion (2-opt)
+        const [start, end] = i < j ? [i, j] : [j, i];
+        const sub = mut.slice(start, end + 1).reverse();
+        for (let k = 0; k < sub.length; k++) mut[start + k] = sub[k];
+      }
+      return mut;
+    }
+
+    document.getElementById("btn-run-ga").addEventListener("click", () => {
+      const btn = document.getElementById("btn-run-ga");
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizing in Browser...';
+      btn.disabled = true;
+
+      const popSize = parseInt(document.getElementById("input-pop-size").value);
+      const pm = parseFloat(document.getElementById("input-mut-rate").value);
+      const pc = parseFloat(document.getElementById("select-crossover").value);
+      const maxGens = parseInt(document.getElementById("select-generations").value);
+      const selMethod = document.getElementById("select-selection").value;
+
+      const startTime = performance.now();
+
+      // Initialize population
+      const customerIds = DATA.customers.map(c => c.id);
+      let population = [];
+      for (let p = 0; p < popSize; p++) {
+        const chrom = customerIds.slice().sort(() => Math.random() - 0.5);
+        population.push(chrom);
+      }
+
+      let evals = population.map(evaluateIndividual);
+      let bestOverall = evals[0];
+      let convGen = 0;
+
+      const history = { generation: [], best_distance: [], avg_distance: [] };
+      let currentGen = 0;
+      const CHUNK_SIZE = 5;
+
+      function stepGenerations() {
+        const endGen = Math.min(maxGens, currentGen + CHUNK_SIZE);
+
+        for (let g = currentGen; g < endGen; g++) {
+          evals = population.map(evaluateIndividual);
+          let genBest = evals[0];
+          let sumDist = 0;
+
+          for (let e = 0; e < evals.length; e++) {
+            sumDist += evals[e].totalDist;
+            if (evals[e].fit > genBest.fit) genBest = evals[e];
+          }
+
+          if (genBest.fit > bestOverall.fit) {
+            bestOverall = genBest;
+            convGen = g;
+          }
+
+          history.generation.push(g);
+          history.best_distance.push(parseFloat(bestOverall.totalDist.toFixed(2)));
+          history.avg_distance.push(parseFloat((sumDist / popSize).toFixed(2)));
+
+          // Elitism: sort and keep top 4%
+          const sortedPop = population.map((c, idx) => ({ c, fit: evals[idx].fit }))
+                                      .sort((a, b) => b.fit - a.fit);
+          const eliteCount = Math.max(1, Math.round(0.04 * popSize));
+          const nextPop = sortedPop.slice(0, eliteCount).map(item => item.c);
+
+          function selectParent() {
+            if (selMethod === "tournament") {
+              const k = 3;
+              let best = Math.floor(Math.random() * popSize);
+              for (let i = 1; i < k; i++) {
+                const cand = Math.floor(Math.random() * popSize);
+                if (evals[cand].fit > evals[best].fit) best = cand;
+              }
+              return population[best];
+            } else {
+              // Roulette
+              const totalFit = evals.reduce((acc, cur) => acc + cur.fit, 0);
+              let pick = Math.random() * totalFit;
+              for (let i = 0; i < popSize; i++) {
+                pick -= evals[i].fit;
+                if (pick <= 0) return population[i];
+              }
+              return population[popSize - 1];
+            }
+          }
+
+          while (nextPop.length < popSize) {
+            const p1 = selectParent();
+            const p2 = selectParent();
+            const [c1, c2] = orderCrossover(p1, p2, pc);
+            nextPop.push(hybridMutate(c1, pm));
+            if (nextPop.length < popSize) nextPop.push(hybridMutate(c2, pm));
+          }
+          population = nextPop;
+        }
+
+        currentGen = endGen;
+        currentRoutes = bestOverall.routes;
+        drawMap();
+
+        if (currentGen < maxGens) {
+          requestAnimationFrame(stepGenerations);
+        } else {
+          // Finished
+          const elapsedSec = ((performance.now() - startTime) / 1000).toFixed(3);
+          const baseDist = DATA.baseline.total_distance_km;
+          const savingsDist = baseDist - bestOverall.totalDist;
+          const savingsPct = (savingsDist / baseDist) * 100;
+
+          const routeDemands = bestOverall.routes.map(r => r.reduce((acc, cId) => acc + (cId === 0 ? 0 : DATA.customers.find(c => c.id === cId).demand), 0));
+          const routeDists = bestOverall.routes.map(r => {
+            let d = 0;
+            for (let i = 0; i < r.length - 1; i++) d += DATA.dist_matrix[r[i]][r[i + 1]];
+            return parseFloat(d.toFixed(2));
+          });
+
+          updateMetrics(
+            baseDist,
+            bestOverall.totalDist,
+            bestOverall.routes.length,
+            savingsDist,
+            savingsPct,
+            elapsedSec,
+            "Client-Side Genetic Algorithm",
+            convGen
+          );
+
+          renderRouteCards(bestOverall.routes, routeDemands, routeDists);
+          updateChart(history);
+
+          btn.innerHTML = '<i class="fa-solid fa-dna"></i> Run Genetic Algorithm Live';
+          btn.disabled = false;
+        }
+      }
+
+      requestAnimationFrame(stepGenerations);
+    });
+
+    window.addEventListener("load", () => {
+      initChart();
+      loadGlobalBest();
+    });
+  </script>
+</body>
+</html>
+"""
+
+final_html = html_template.replace("__DATA_PLACEHOLDER__", data_str)
+
+with open(root / "index.html", "w", encoding="utf-8") as f:
+    f.write(final_html)
+
+# Also update templates/index.html so Flask serves the identical enhanced version
+with open(root / "templates" / "index.html", "w", encoding="utf-8") as f:
+    f.write(final_html)
+
+print("index.html compiled successfully at repository root and templates/!")
