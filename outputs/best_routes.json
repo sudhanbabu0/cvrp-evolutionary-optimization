@@ -1,0 +1,228 @@
+{
+  "problem_metadata": {
+    "num_customers": 35,
+    "total_nodes": 36,
+    "depot_coordinate": [
+      50.0,
+      50.0
+    ],
+    "vehicle_capacity": 100,
+    "max_fleet_limit": 8,
+    "total_customer_demand": 580,
+    "theoretical_min_fleet": 6,
+    "instance_seed": 42
+  },
+  "baseline_nearest_neighbor": {
+    "solver_type": "Deterministic Greedy Nearest-Neighbor with Capacity Splitting",
+    "total_distance_km": 1036.59,
+    "vehicles_utilized": 7,
+    "runtime_seconds": 0.00042,
+    "routes": [
+      [
+        0,
+        24,
+        9,
+        33,
+        14,
+        21,
+        12,
+        0
+      ],
+      [
+        0,
+        20,
+        2,
+        5,
+        13,
+        1,
+        28,
+        0
+      ],
+      [
+        0,
+        10,
+        31,
+        25,
+        16,
+        11,
+        15,
+        26,
+        0
+      ],
+      [
+        0,
+        23,
+        34,
+        4,
+        22,
+        17,
+        0
+      ],
+      [
+        0,
+        32,
+        7,
+        19,
+        8,
+        3,
+        0
+      ],
+      [
+        0,
+        30,
+        29,
+        6,
+        35,
+        18,
+        0
+      ],
+      [
+        0,
+        27,
+        0
+      ]
+    ],
+    "route_demands": [
+      91,
+      91,
+      100,
+      89,
+      85,
+      99,
+      25
+    ],
+    "route_distances_km": [
+      76.87,
+      138.32,
+      180.09,
+      117.23,
+      154.54,
+      263.19,
+      106.34
+    ]
+  },
+  "genetic_algorithm_best": {
+    "total_distance_km": 727.17,
+    "best_fitness": 0.0013733,
+    "vehicles_utilized": 6,
+    "generation_converged": 108,
+    "total_generations": 110,
+    "runtime_seconds": 0.7959,
+    "distance_savings_km": 309.42,
+    "distance_savings_percent": 29.85,
+    "routes": [
+      [
+        0,
+        12,
+        29,
+        30,
+        21,
+        14,
+        33,
+        0
+      ],
+      [
+        0,
+        17,
+        22,
+        4,
+        34,
+        23,
+        0
+      ],
+      [
+        0,
+        24,
+        9,
+        6,
+        35,
+        1,
+        13,
+        0
+      ],
+      [
+        0,
+        5,
+        28,
+        27,
+        18,
+        26,
+        2,
+        0
+      ],
+      [
+        0,
+        10,
+        31,
+        8,
+        3,
+        19,
+        25,
+        0
+      ],
+      [
+        0,
+        16,
+        11,
+        15,
+        7,
+        32,
+        20,
+        0
+      ]
+    ],
+    "route_demands": [
+      99,
+      89,
+      99,
+      97,
+      96,
+      100
+    ],
+    "route_distances_km": [
+      110.22,
+      117.23,
+      140.2,
+      131.37,
+      113.86,
+      114.28
+    ],
+    "best_chromosome": [
+      12,
+      29,
+      30,
+      21,
+      14,
+      33,
+      17,
+      22,
+      4,
+      34,
+      23,
+      24,
+      9,
+      6,
+      35,
+      1,
+      13,
+      5,
+      28,
+      27,
+      18,
+      26,
+      2,
+      10,
+      31,
+      8,
+      3,
+      19,
+      25,
+      16,
+      11,
+      15,
+      7,
+      32,
+      20
+    ]
+  }
+}

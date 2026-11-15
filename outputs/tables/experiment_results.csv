@@ -1,0 +1,71 @@
+experiment_category,parameter_name,parameter_value,seed,best_distance,best_fitness,num_vehicles,convergence_gen,total_generations,runtime_sec
+Population Size,pop_size,40,42,797.14,0.00125292,7,18,60,0.1016
+Population Size,pop_size,40,101,807.04,0.00123757,7,59,97,0.1861
+Population Size,pop_size,40,202,813.39,0.00122791,7,79,88,0.1579
+Population Size,pop_size,40,303,785.36,0.00127169,7,64,97,0.1544
+Population Size,pop_size,40,404,813.65,0.00122753,7,88,89,0.2038
+Population Size,pop_size,100,42,778.07,0.00128358,7,51,76,0.2867
+Population Size,pop_size,100,101,777.99,0.00128371,7,50,96,0.3585
+Population Size,pop_size,100,202,768.81,0.00129903,6,106,119,0.5179
+Population Size,pop_size,100,303,773.02,0.00129195,7,149,177,0.629
+Population Size,pop_size,100,404,809.56,0.00123372,7,45,95,0.3564
+Population Size,pop_size,200,42,727.17,0.0013733,6,108,110,0.7959
+Population Size,pop_size,200,101,776.99,0.00128536,7,30,75,0.5338
+Population Size,pop_size,200,202,808.85,0.00123479,7,75,112,0.8251
+Population Size,pop_size,200,303,793.74,0.00125827,7,39,83,0.6215
+Population Size,pop_size,200,404,796.64,0.00125371,7,58,60,0.4254
+Mutation Rate,mutation_rate,0.01,42,802.7,0.00124424,7,0,60,0.2153
+Mutation Rate,mutation_rate,0.01,101,820.01,0.00121802,7,1,61,0.229
+Mutation Rate,mutation_rate,0.01,202,835.81,0.00119502,7,6,60,0.2242
+Mutation Rate,mutation_rate,0.01,303,814.0,0.00122699,7,16,72,0.2746
+Mutation Rate,mutation_rate,0.01,404,837.2,0.00119303,7,0,60,0.2231
+Mutation Rate,mutation_rate,0.08,42,778.07,0.00128358,7,51,76,0.2851
+Mutation Rate,mutation_rate,0.08,101,777.99,0.00128371,7,50,96,0.3395
+Mutation Rate,mutation_rate,0.08,202,768.81,0.00129903,6,106,119,0.4193
+Mutation Rate,mutation_rate,0.08,303,773.02,0.00129195,7,149,177,0.6978
+Mutation Rate,mutation_rate,0.08,404,809.56,0.00123372,7,45,95,0.3385
+Mutation Rate,mutation_rate,0.2,42,796.64,0.00125371,7,40,60,0.2204
+Mutation Rate,mutation_rate,0.2,101,795.16,0.00125604,7,79,127,0.4557
+Mutation Rate,mutation_rate,0.2,202,773.9,0.0012905,7,113,139,0.5372
+Mutation Rate,mutation_rate,0.2,303,790.64,0.00126319,7,78,93,0.3467
+Mutation Rate,mutation_rate,0.2,404,810.03,0.00123299,7,67,93,0.3521
+Crossover Rate,crossover_rate,0.6,42,796.43,0.00125402,7,57,60,0.2101
+Crossover Rate,crossover_rate,0.6,101,802.5,0.00124456,7,78,93,0.3151
+Crossover Rate,crossover_rate,0.6,202,803.07,0.00124368,7,48,97,0.3369
+Crossover Rate,crossover_rate,0.6,303,820.07,0.00121793,7,55,68,0.24
+Crossover Rate,crossover_rate,0.6,404,818.32,0.00122053,7,14,69,0.2512
+Crossover Rate,crossover_rate,0.85,42,778.07,0.00128358,7,51,76,0.2774
+Crossover Rate,crossover_rate,0.85,101,777.99,0.00128371,7,50,96,0.3541
+Crossover Rate,crossover_rate,0.85,202,768.81,0.00129903,6,106,119,0.4182
+Crossover Rate,crossover_rate,0.85,303,773.02,0.00129195,7,149,177,0.6475
+Crossover Rate,crossover_rate,0.85,404,809.56,0.00123372,7,45,95,0.3589
+Crossover Rate,crossover_rate,0.95,42,798.89,0.00125017,7,30,60,0.2275
+Crossover Rate,crossover_rate,0.95,101,799.53,0.00124917,7,69,74,0.2795
+Crossover Rate,crossover_rate,0.95,202,763.5,0.00130804,6,50,109,0.3824
+Crossover Rate,crossover_rate,0.95,303,802.39,0.00124472,7,104,104,0.386
+Crossover Rate,crossover_rate,0.95,404,814.12,0.00122681,7,36,85,0.3181
+Max Generations,max_generations,100,42,778.07,0.00128358,7,51,76,0.281
+Max Generations,max_generations,100,101,777.99,0.00128371,7,50,96,0.3578
+Max Generations,max_generations,100,202,768.81,0.00129903,6,60,100,0.3554
+Max Generations,max_generations,100,303,783.5,0.00127471,7,96,100,0.3522
+Max Generations,max_generations,100,404,809.56,0.00123372,7,45,95,0.3577
+Max Generations,max_generations,250,42,778.07,0.00128358,7,51,76,0.2824
+Max Generations,max_generations,250,101,777.99,0.00128371,7,50,96,0.3488
+Max Generations,max_generations,250,202,768.81,0.00129903,6,106,119,0.4316
+Max Generations,max_generations,250,303,773.02,0.00129195,7,149,177,0.6306
+Max Generations,max_generations,250,404,809.56,0.00123372,7,45,95,0.3504
+Max Generations,max_generations,500,42,778.07,0.00128358,7,51,76,0.282
+Max Generations,max_generations,500,101,777.99,0.00128371,7,50,96,0.351
+Max Generations,max_generations,500,202,768.81,0.00129903,6,106,119,0.4226
+Max Generations,max_generations,500,303,773.02,0.00129195,7,149,177,0.6327
+Max Generations,max_generations,500,404,809.56,0.00123372,7,45,95,0.3563
+Selection Method,selection_method,Tournament (k=3),42,778.07,0.00128358,7,51,76,0.2855
+Selection Method,selection_method,Tournament (k=3),101,777.99,0.00128371,7,50,96,0.3513
+Selection Method,selection_method,Tournament (k=3),202,768.81,0.00129903,6,106,119,0.4165
+Selection Method,selection_method,Tournament (k=3),303,773.02,0.00129195,7,149,177,0.6533
+Selection Method,selection_method,Tournament (k=3),404,809.56,0.00123372,7,45,95,0.3549
+Selection Method,selection_method,Roulette Wheel,42,802.7,0.00124424,7,0,60,0.2407
+Selection Method,selection_method,Roulette Wheel,101,829.47,0.00120413,7,41,60,0.2358
+Selection Method,selection_method,Roulette Wheel,202,836.92,0.00119343,7,11,60,0.2336
+Selection Method,selection_method,Roulette Wheel,303,809.92,0.00123317,7,49,97,0.364
+Selection Method,selection_method,Roulette Wheel,404,831.57,0.00120109,7,45,60,0.2571
