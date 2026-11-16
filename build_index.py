@@ -1,7 +1,7 @@
 """
 build_index.py
 Compiles the static client-side index.html for direct GitHub Pages deployment
-with interactive user configuration (delivery sites, trucks, warehouse distance table),
+with direct user input for distance from warehouse to every delivery site,
 individual truck animation & inspection, medium animation speed controls,
 and academic assessment branding removed.
 """
@@ -49,10 +49,10 @@ html_template = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Problem Badges & Scenario Builder Trigger -->
+      <!-- Problem Badges & Configuration Trigger -->
       <div class="flex flex-wrap items-center gap-2 text-xs">
-        <button id="btn-open-scenario-modal" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1 rounded-md shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer">
-          <i class="fa-solid fa-sliders"></i> Configure Sites & Trucks
+        <button id="btn-open-scenario-modal" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1 rounded-md shadow-md shadow-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-ruler-combined"></i> Set Distances & Trucks
         </button>
         <span id="badge-sites" class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-location-dot text-indigo-400 mr-1.5"></i>35 Delivery Sites</span>
         <span id="badge-depot" class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-warehouse text-amber-400 mr-1.5"></i>Warehouse (50, 50)</span>
@@ -187,8 +187,8 @@ html_template = """<!DOCTYPE html>
               <i class="fa-solid fa-sliders text-emerald-400"></i>
               Optimization Controls
             </h2>
-            <button id="btn-quick-config" class="text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg transition cursor-pointer">
-              <i class="fa-solid fa-gear mr-1"></i> Custom Setup
+            <button id="btn-quick-config" class="text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1">
+              <i class="fa-solid fa-ruler"></i> Set Distances
             </button>
           </div>
 
@@ -288,18 +288,18 @@ html_template = """<!DOCTYPE html>
   </main>
 
   <!-- ============================================================ -->
-  <!-- MODAL: Custom Delivery Scenario & Distance to Warehouse Table -->
+  <!-- MODAL: Direct User Input for Warehouse Distances & Trucks    -->
   <!-- ============================================================ -->
   <div id="modal-scenario" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
       <!-- Modal Header -->
       <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-850">
         <div>
           <h3 class="text-lg font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-warehouse text-amber-400"></i>
-            Custom Delivery Sites, Trucks & Warehouse Distance Configuration
+            <i class="fa-solid fa-ruler-combined text-emerald-400"></i>
+            User Input: Delivery Sites, Trucks & Distance from Warehouse
           </h3>
-          <p class="text-xs text-slate-400 mt-0.5">Customize the number of delivery sites, fleet size, warehouse coordinates, and distance table.</p>
+          <p class="text-xs text-slate-400 mt-0.5">Directly enter the distance from warehouse for every delivery site, configure number of sites and truck fleet.</p>
         </div>
         <button id="btn-close-modal" class="text-slate-400 hover:text-white text-lg p-1 transition cursor-pointer">
           <i class="fa-solid fa-xmark"></i>
@@ -309,7 +309,7 @@ html_template = """<!DOCTYPE html>
       <!-- Modal Body (Scrollable) -->
       <div class="p-5 space-y-5 overflow-y-auto custom-scroll text-xs">
         
-        <!-- Top Parameters: Warehouse Coords, Truck Fleet, Capacity -->
+        <!-- Fleet & Warehouse Setup -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-800/60 rounded-xl border border-slate-700/60">
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Warehouse X (km):</label>
@@ -320,8 +320,8 @@ html_template = """<!DOCTYPE html>
             <input type="number" id="input-depot-y" value="50.0" min="0" max="100" step="1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
           </div>
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Available Trucks (K):</label>
-            <input type="number" id="input-fleet-limit" value="8" min="1" max="15" step="1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
+            <label class="block text-emerald-400 font-bold mb-1"><i class="fa-solid fa-truck mr-1"></i>Number of Trucks (K):</label>
+            <input type="number" id="input-fleet-limit" value="8" min="1" max="15" step="1" class="w-full bg-slate-900 border-2 border-emerald-500/50 rounded-lg p-2 text-white font-mono font-bold">
           </div>
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Truck Capacity (Q):</label>
@@ -329,41 +329,60 @@ html_template = """<!DOCTYPE html>
           </div>
         </div>
 
-        <!-- Quick Generator Tools -->
-        <div class="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-          <div class="flex items-center space-x-2">
-            <span class="text-slate-300 font-semibold">Number of Delivery Sites:</span>
-            <input type="number" id="input-num-sites" value="35" min="5" max="50" class="w-20 bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-center text-slate-100 font-mono font-bold">
-            <button id="btn-generate-random" class="bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer">
-              <i class="fa-solid fa-dice mr-1"></i> Generate Random Sites
-            </button>
-            <button id="btn-reset-benchmark" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer">
-              <i class="fa-solid fa-rotate-left mr-1"></i> Reset 35-Site Benchmark
+        <!-- Number of Delivery Sites & Quick Tools -->
+        <div class="p-4 bg-slate-850 rounded-xl border border-slate-700/70 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-2">
+              <span class="text-white font-bold"><i class="fa-solid fa-location-dot text-indigo-400 mr-1.5"></i>Number of Delivery Sites:</span>
+              <input type="number" id="input-num-sites" value="35" min="3" max="50" class="w-20 bg-slate-900 border-2 border-indigo-500 rounded-lg p-1.5 text-center text-white font-mono font-bold text-sm">
+              <button id="btn-update-num-sites" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer">
+                Set Site Count
+              </button>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+              <button id="btn-generate-random" class="bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 px-3 py-1.5 rounded-lg transition cursor-pointer">
+                <i class="fa-solid fa-dice mr-1"></i> Randomize Sites
+              </button>
+              <button id="btn-reset-benchmark" class="bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 px-3 py-1.5 rounded-lg transition cursor-pointer">
+                <i class="fa-solid fa-rotate-left mr-1"></i> Reset 35-Site Benchmark
+              </button>
+              <button id="btn-add-single-site" class="bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer">
+                <i class="fa-solid fa-plus mr-1"></i> Add Site
+              </button>
+            </div>
+          </div>
+
+          <!-- Bulk Distance Input (Type or Paste all distances directly) -->
+          <div class="pt-2 border-t border-slate-700/60 flex flex-wrap items-center gap-2">
+            <span class="text-slate-300 font-semibold"><i class="fa-solid fa-paste text-amber-400 mr-1"></i>Bulk Enter Distances (km):</span>
+            <input type="text" id="input-bulk-distances" placeholder="e.g. 15.2, 28.5, 42.0, 18.7, 33.1, 24.0..." class="flex-1 min-w-[240px] bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-mono">
+            <button id="btn-apply-bulk-dist" class="bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg transition font-semibold cursor-pointer">
+              Apply to All Sites
             </button>
           </div>
-          <button id="btn-add-single-site" class="bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer">
-            <i class="fa-solid fa-plus mr-1"></i> Add Delivery Site
-          </button>
         </div>
 
-        <!-- Delivery Sites & Distance to Warehouse Table -->
+        <!-- Editable Delivery Sites & Distance to Warehouse Table -->
         <div>
           <div class="flex items-center justify-between mb-2">
             <h4 class="font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-table-list text-cyan-400"></i>
-              Delivery Sites & Distance from Warehouse Table
+              Interactive Delivery Sites & Distance from Warehouse Table
             </h4>
-            <span id="custom-sites-count" class="text-slate-400">35 Sites Configured &bull; Total Demand: 580 units</span>
+            <span id="custom-sites-count" class="text-emerald-400 font-semibold">35 Sites Configured &bull; Total Demand: 580 units</span>
           </div>
 
-          <div class="max-h-64 overflow-y-auto custom-scroll border border-slate-700 rounded-xl bg-slate-950">
+          <div class="max-h-72 overflow-y-auto custom-scroll border border-slate-700 rounded-xl bg-slate-950">
             <table class="w-full text-left border-collapse">
-              <thead class="bg-slate-800 text-slate-300 sticky top-0 border-b border-slate-700">
+              <thead class="bg-slate-800 text-slate-300 sticky top-0 border-b border-slate-700 shadow-md">
                 <tr>
                   <th class="p-2.5 text-center">Site #</th>
-                  <th class="p-2.5">X Coord (km)</th>
-                  <th class="p-2.5">Y Coord (km)</th>
-                  <th class="p-2.5 text-emerald-400"><i class="fa-solid fa-ruler mr-1"></i>Dist to Warehouse (km)</th>
+                  <th class="p-2.5 text-emerald-400 font-bold bg-emerald-950/40 border-l border-r border-emerald-500/30">
+                    <i class="fa-solid fa-ruler mr-1.5"></i>Distance from Warehouse (km) <span class="text-[10px] text-emerald-300 font-normal">[EDITABLE]</span>
+                  </th>
+                  <th class="p-2.5">Direction Angle (°)</th>
+                  <th class="p-2.5">X, Y Position (km)</th>
                   <th class="p-2.5">Parcel Demand (units)</th>
                   <th class="p-2.5 text-center">Action</th>
                 </tr>
@@ -379,13 +398,13 @@ html_template = """<!DOCTYPE html>
 
       <!-- Modal Footer -->
       <div class="p-4 border-t border-slate-800 bg-slate-850 flex items-center justify-between">
-        <span class="text-xs text-slate-400"><i class="fa-solid fa-circle-info text-cyan-400 mr-1"></i>Changes will be applied to the 2D map, distance matrix, and evolutionary optimizer.</span>
+        <span class="text-xs text-slate-400"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>Distances entered are applied directly to the distance matrix and fleet optimizer.</span>
         <div class="flex items-center space-x-3">
           <button id="btn-cancel-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition cursor-pointer">
             Cancel
           </button>
           <button id="btn-apply-scenario" class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/20 transition cursor-pointer">
-            <i class="fa-solid fa-check mr-1.5"></i> Apply Custom Scenario & Recalculate
+            <i class="fa-solid fa-check mr-1.5"></i> Apply User Inputs & Optimize Routes
           </button>
         </div>
       </div>
@@ -494,7 +513,7 @@ html_template = """<!DOCTYPE html>
           }
         }
         document.getElementById("active-truck-info").textContent = 
-          `Stops: ${route.length - 2} | Load: ${load}/${DATA.capacity} units (${Math.round((load/DATA.capacity)*100)}%) | Route Dist: ${dist.toFixed(2)} km`;
+          `Stops: ${route.length - 2} | Cargo: ${load}/${DATA.capacity} units (${Math.round((load/DATA.capacity)*100)}%) | Route Dist: ${dist.toFixed(2)} km`;
       }
     }
 
@@ -1086,9 +1105,9 @@ html_template = """<!DOCTYPE html>
       requestAnimationFrame(stepGenerations);
     });
 
-    // ==========================================
-    // CUSTOM SCENARIO BUILDER & DISTANCE TABLE
-    // ==========================================
+    // ============================================================
+    // USER INPUT: WAREHOUSE DISTANCE TABLE, TRUCKS & DELIVERY SITES
+    // ============================================================
     const modal = document.getElementById("modal-scenario");
     document.getElementById("btn-open-scenario-modal").addEventListener("click", openScenarioModal);
     document.getElementById("btn-quick-config").addEventListener("click", openScenarioModal);
@@ -1100,7 +1119,20 @@ html_template = """<!DOCTYPE html>
 
     function openScenarioModal() {
       tempDepot = { x: DATA.depot.x, y: DATA.depot.y };
-      tempCustomers = JSON.parse(JSON.stringify(DATA.customers));
+      tempCustomers = DATA.customers.map(c => {
+        const dx = c.x - tempDepot.x;
+        const dy = c.y - tempDepot.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        let angle = Math.round((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360);
+        return {
+          id: c.id,
+          x: c.x,
+          y: c.y,
+          distToDepot: parseFloat(dist.toFixed(1)),
+          angle: angle,
+          demand: c.demand
+        };
+      });
 
       document.getElementById("input-depot-x").value = tempDepot.x;
       document.getElementById("input-depot-y").value = tempDepot.y;
@@ -1112,12 +1144,6 @@ html_template = """<!DOCTYPE html>
       modal.classList.remove("hidden");
     }
 
-    function calculateDistToWarehouse(x, y) {
-      const dx = x - tempDepot.x;
-      const dy = y - tempDepot.y;
-      return Math.sqrt(dx * dx + dy * dy);
-    }
-
     function renderCustomSitesTable() {
       const tbody = document.getElementById("custom-sites-tbody");
       tbody.innerHTML = "";
@@ -1125,28 +1151,56 @@ html_template = """<!DOCTYPE html>
       let totalDemand = 0;
 
       tempCustomers.forEach((cust, idx) => {
-        cust.id = idx + 1; // ensure 1..N order
+        cust.id = idx + 1; // 1..N order
         totalDemand += cust.demand;
-        const distToDepot = calculateDistToWarehouse(cust.x, cust.y).toFixed(2);
 
         const tr = document.createElement("tr");
         tr.className = "hover:bg-slate-800/60";
         tr.innerHTML = `
-          <td class="p-2 text-center font-bold text-white">${cust.id}</td>
-          <td class="p-2">
-            <input type="number" step="0.1" min="0" max="100" value="${cust.x}" class="inp-coord-x w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white" data-idx="${idx}">
+          <td class="p-2.5 text-center font-bold text-white">${cust.id}</td>
+          
+          <!-- PRIMARY USER INPUT: Distance from Warehouse (km) -->
+          <td class="p-2.5 bg-emerald-950/30 border-l border-r border-emerald-500/20">
+            <div class="flex items-center space-x-1">
+              <input type="number" step="0.5" min="1" max="150" value="${cust.distToDepot}" 
+                     class="inp-warehouse-dist w-28 bg-slate-900 border-2 border-emerald-500 rounded px-2 py-1 text-xs text-emerald-300 font-bold font-mono outline-none focus:border-emerald-400" 
+                     data-idx="${idx}">
+              <span class="text-emerald-400 font-semibold text-xs">km</span>
+            </div>
           </td>
-          <td class="p-2">
-            <input type="number" step="0.1" min="0" max="100" value="${cust.y}" class="inp-coord-y w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white" data-idx="${idx}">
+
+          <!-- Angle / Direction (°) -->
+          <td class="p-2.5">
+            <div class="flex items-center space-x-1">
+              <input type="number" step="5" min="0" max="360" value="${cust.angle}" 
+                     class="inp-angle w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-200 font-mono" 
+                     data-idx="${idx}">
+              <span class="text-slate-400 text-xs">°</span>
+            </div>
           </td>
-          <td class="p-2 text-emerald-400 font-bold" id="dist-label-${idx}">
-            ${distToDepot} km
+
+          <!-- Coordinates X, Y (Auto-calculated from distance + angle, or editable) -->
+          <td class="p-2.5 text-slate-300">
+            <div class="flex items-center space-x-1">
+              <span class="text-slate-500 text-[11px]">X:</span>
+              <input type="number" step="0.5" value="${cust.x.toFixed(1)}" class="inp-coord-x w-16 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-xs text-slate-300 font-mono" data-idx="${idx}">
+              <span class="text-slate-500 text-[11px] ml-1">Y:</span>
+              <input type="number" step="0.5" value="${cust.y.toFixed(1)}" class="inp-coord-y w-16 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-xs text-slate-300 font-mono" data-idx="${idx}">
+            </div>
           </td>
-          <td class="p-2">
-            <input type="number" min="1" max="100" value="${cust.demand}" class="inp-demand w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white" data-idx="${idx}">
+
+          <!-- Demand (units) -->
+          <td class="p-2.5">
+            <div class="flex items-center space-x-1">
+              <input type="number" min="1" max="100" value="${cust.demand}" 
+                     class="inp-demand w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white font-mono" 
+                     data-idx="${idx}">
+              <span class="text-slate-400 text-xs">u</span>
+            </div>
           </td>
-          <td class="p-2 text-center">
-            <button class="btn-del-site text-red-400 hover:text-red-300 p-1 cursor-pointer" data-idx="${idx}">
+
+          <td class="p-2.5 text-center">
+            <button class="btn-del-site text-red-400 hover:text-red-300 p-1 cursor-pointer" data-idx="${idx}" title="Remove this site">
               <i class="fa-solid fa-trash"></i>
             </button>
           </td>
@@ -1155,14 +1209,51 @@ html_template = """<!DOCTYPE html>
       });
 
       document.getElementById("custom-sites-count").textContent = 
-        `${tempCustomers.length} Sites Configured • Total Demand: ${totalDemand} units`;
+        `${tempCustomers.length} Sites Configured | Total Demand: ${totalDemand} units`;
 
-      // Coordinate change listeners
+      // 1. PRIMARY: User edits Distance from Warehouse directly!
+      tbody.querySelectorAll(".inp-warehouse-dist").forEach(inp => {
+        inp.addEventListener("input", e => {
+          const idx = parseInt(e.target.dataset.idx);
+          const newDist = Math.max(1, parseFloat(e.target.value) || 1);
+          tempCustomers[idx].distToDepot = newDist;
+          
+          // Recompute coordinates (X, Y) from Distance and Angle
+          const rad = tempCustomers[idx].angle * Math.PI / 180;
+          tempCustomers[idx].x = parseFloat((tempDepot.x + newDist * Math.cos(rad)).toFixed(1));
+          tempCustomers[idx].y = parseFloat((tempDepot.y + newDist * Math.sin(rad)).toFixed(1));
+
+          // Update X, Y input boxes in the table
+          const tr = e.target.closest("tr");
+          tr.querySelector(".inp-coord-x").value = tempCustomers[idx].x.toFixed(1);
+          tr.querySelector(".inp-coord-y").value = tempCustomers[idx].y.toFixed(1);
+        });
+      });
+
+      // 2. User edits Angle directly
+      tbody.querySelectorAll(".inp-angle").forEach(inp => {
+        inp.addEventListener("input", e => {
+          const idx = parseInt(e.target.dataset.idx);
+          const newAngle = (parseFloat(e.target.value) || 0) % 360;
+          tempCustomers[idx].angle = newAngle;
+
+          const rad = newAngle * Math.PI / 180;
+          const dist = tempCustomers[idx].distToDepot;
+          tempCustomers[idx].x = parseFloat((tempDepot.x + dist * Math.cos(rad)).toFixed(1));
+          tempCustomers[idx].y = parseFloat((tempDepot.y + dist * Math.sin(rad)).toFixed(1));
+
+          const tr = e.target.closest("tr");
+          tr.querySelector(".inp-coord-x").value = tempCustomers[idx].x.toFixed(1);
+          tr.querySelector(".inp-coord-y").value = tempCustomers[idx].y.toFixed(1);
+        });
+      });
+
+      // 3. User edits X or Y coordinates directly
       tbody.querySelectorAll(".inp-coord-x").forEach(inp => {
         inp.addEventListener("input", e => {
           const idx = parseInt(e.target.dataset.idx);
           tempCustomers[idx].x = parseFloat(e.target.value) || 0;
-          document.getElementById(`dist-label-${idx}`).textContent = `${calculateDistToWarehouse(tempCustomers[idx].x, tempCustomers[idx].y).toFixed(2)} km`;
+          syncDistFromCoords(idx, e.target.closest("tr"));
         });
       });
 
@@ -1170,19 +1261,32 @@ html_template = """<!DOCTYPE html>
         inp.addEventListener("input", e => {
           const idx = parseInt(e.target.dataset.idx);
           tempCustomers[idx].y = parseFloat(e.target.value) || 0;
-          document.getElementById(`dist-label-${idx}`).textContent = `${calculateDistToWarehouse(tempCustomers[idx].x, tempCustomers[idx].y).toFixed(2)} km`;
+          syncDistFromCoords(idx, e.target.closest("tr"));
         });
       });
 
+      function syncDistFromCoords(idx, tr) {
+        const dx = tempCustomers[idx].x - tempDepot.x;
+        const dy = tempCustomers[idx].y - tempDepot.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.round((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360);
+        tempCustomers[idx].distToDepot = parseFloat(dist.toFixed(1));
+        tempCustomers[idx].angle = angle;
+        tr.querySelector(".inp-warehouse-dist").value = tempCustomers[idx].distToDepot;
+        tr.querySelector(".inp-angle").value = angle;
+      }
+
+      // 4. User edits demand
       tbody.querySelectorAll(".inp-demand").forEach(inp => {
         inp.addEventListener("input", e => {
           const idx = parseInt(e.target.dataset.idx);
           tempCustomers[idx].demand = parseInt(e.target.value) || 10;
           const sum = tempCustomers.reduce((acc, c) => acc + c.demand, 0);
-          document.getElementById("custom-sites-count").textContent = `${tempCustomers.length} Sites Configured • Total Demand: ${sum} units`;
+          document.getElementById("custom-sites-count").textContent = `${tempCustomers.length} Sites Configured | Total Demand: ${sum} units`;
         });
       });
 
+      // 5. Delete button
       tbody.querySelectorAll(".btn-del-site").forEach(btn => {
         btn.addEventListener("click", e => {
           const idx = parseInt(btn.dataset.idx);
@@ -1196,13 +1300,65 @@ html_template = """<!DOCTYPE html>
       });
     }
 
-    // Warehouse coordinate change updates distance table in modal
+    // Warehouse coordinate change
     document.getElementById("input-depot-x").addEventListener("input", e => {
       tempDepot.x = parseFloat(e.target.value) || 0;
+      tempCustomers.forEach(c => {
+        const rad = c.angle * Math.PI / 180;
+        c.x = parseFloat((tempDepot.x + c.distToDepot * Math.cos(rad)).toFixed(1));
+        c.y = parseFloat((tempDepot.y + c.distToDepot * Math.sin(rad)).toFixed(1));
+      });
       renderCustomSitesTable();
     });
     document.getElementById("input-depot-y").addEventListener("input", e => {
       tempDepot.y = parseFloat(e.target.value) || 0;
+      tempCustomers.forEach(c => {
+        const rad = c.angle * Math.PI / 180;
+        c.x = parseFloat((tempDepot.x + c.distToDepot * Math.cos(rad)).toFixed(1));
+        c.y = parseFloat((tempDepot.y + c.distToDepot * Math.sin(rad)).toFixed(1));
+      });
+      renderCustomSitesTable();
+    });
+
+    // Bulk Apply Distances
+    document.getElementById("btn-apply-bulk-dist").addEventListener("click", () => {
+      const raw = document.getElementById("input-bulk-distances").value.trim();
+      if (!raw) return;
+      const parsed = raw.split(/[,\\s]+/).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+      if (parsed.length === 0) return;
+
+      parsed.forEach((d, i) => {
+        if (i < tempCustomers.length) {
+          tempCustomers[i].distToDepot = d;
+          const rad = tempCustomers[i].angle * Math.PI / 180;
+          tempCustomers[i].x = parseFloat((tempDepot.x + d * Math.cos(rad)).toFixed(1));
+          tempCustomers[i].y = parseFloat((tempDepot.y + d * Math.sin(rad)).toFixed(1));
+        }
+      });
+      renderCustomSitesTable();
+    });
+
+    // Set Site Count Directly
+    document.getElementById("btn-update-num-sites").addEventListener("click", () => {
+      const count = Math.max(3, Math.min(50, parseInt(document.getElementById("input-num-sites").value) || 15));
+      if (count > tempCustomers.length) {
+        while (tempCustomers.length < count) {
+          const i = tempCustomers.length + 1;
+          const dist = parseFloat((Math.random() * 38 + 8).toFixed(1)); // 8..46 km
+          const angle = Math.round((i * (360 / count)) % 360);
+          const rad = angle * Math.PI / 180;
+          tempCustomers.push({
+            id: i,
+            distToDepot: dist,
+            angle: angle,
+            x: parseFloat((tempDepot.x + dist * Math.cos(rad)).toFixed(1)),
+            y: parseFloat((tempDepot.y + dist * Math.sin(rad)).toFixed(1)),
+            demand: Math.floor(Math.random() * 16 + 10)
+          });
+        }
+      } else if (count < tempCustomers.length) {
+        tempCustomers = tempCustomers.slice(0, count);
+      }
       renderCustomSitesTable();
     });
 
@@ -1211,10 +1367,15 @@ html_template = """<!DOCTYPE html>
       const n = Math.max(5, Math.min(50, parseInt(document.getElementById("input-num-sites").value) || 20));
       tempCustomers = [];
       for (let i = 1; i <= n; i++) {
+        const dist = parseFloat((Math.random() * 40 + 6).toFixed(1)); // 6..46 km from warehouse
+        const angle = Math.round((Math.random() * 360));
+        const rad = angle * Math.PI / 180;
         tempCustomers.push({
           id: i,
-          x: parseFloat((Math.random() * 85 + 7).toFixed(1)),
-          y: parseFloat((Math.random() * 85 + 7).toFixed(1)),
+          distToDepot: dist,
+          angle: angle,
+          x: parseFloat((tempDepot.x + dist * Math.cos(rad)).toFixed(1)),
+          y: parseFloat((tempDepot.y + dist * Math.sin(rad)).toFixed(1)),
           demand: Math.floor(Math.random() * 16 + 10) // 10..25 units
         });
       }
@@ -1224,7 +1385,18 @@ html_template = """<!DOCTYPE html>
     // Reset Benchmark
     document.getElementById("btn-reset-benchmark").addEventListener("click", () => {
       tempDepot = { x: 50.0, y: 50.0 };
-      tempCustomers = JSON.parse(JSON.stringify(INITIAL_BENCHMARK_DATA.customers));
+      tempCustomers = INITIAL_BENCHMARK_DATA.customers.map(c => {
+        const dx = c.x - 50.0;
+        const dy = c.y - 50.0;
+        return {
+          id: c.id,
+          x: c.x,
+          y: c.y,
+          distToDepot: parseFloat(Math.sqrt(dx * dx + dy * dy).toFixed(1)),
+          angle: Math.round((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360),
+          demand: c.demand
+        };
+      });
       document.getElementById("input-depot-x").value = 50.0;
       document.getElementById("input-depot-y").value = 50.0;
       document.getElementById("input-fleet-limit").value = 8;
@@ -1240,12 +1412,18 @@ html_template = """<!DOCTYPE html>
         return;
       }
       const newId = tempCustomers.length + 1;
+      const dist = 25.0;
+      const angle = (newId * 37) % 360;
+      const rad = angle * Math.PI / 180;
       tempCustomers.push({
         id: newId,
-        x: parseFloat((Math.random() * 80 + 10).toFixed(1)),
-        y: parseFloat((Math.random() * 80 + 10).toFixed(1)),
+        distToDepot: dist,
+        angle: angle,
+        x: parseFloat((tempDepot.x + dist * Math.cos(rad)).toFixed(1)),
+        y: parseFloat((tempDepot.y + dist * Math.sin(rad)).toFixed(1)),
         demand: 15
       });
+      document.getElementById("input-num-sites").value = tempCustomers.length;
       renderCustomSitesTable();
     });
 
@@ -1315,7 +1493,7 @@ html_template = """<!DOCTYPE html>
       };
     }
 
-    // Apply Custom Scenario & Recalculate
+    // Apply User Inputs (Distances, Trucks, Sites) & Recalculate
     document.getElementById("btn-apply-scenario").addEventListener("click", () => {
       DATA.depot = { x: parseFloat(document.getElementById("input-depot-x").value) || 50, y: parseFloat(document.getElementById("input-depot-y").value) || 50 };
       DATA.fleet_limit = parseInt(document.getElementById("input-fleet-limit").value) || 8;
@@ -1324,6 +1502,7 @@ html_template = """<!DOCTYPE html>
       DATA.total_demand = DATA.customers.reduce((acc, c) => acc + c.demand, 0);
 
       // Recompute Distance Matrix: (N+1) x (N+1)
+      // Exactly respect user-entered distToDepot for edge between depot (0) and site (i)
       const numNodes = DATA.customers.length + 1;
       const allNodes = [{ id: 0, x: DATA.depot.x, y: DATA.depot.y }, ...DATA.customers];
       const newDistMatrix = [];
@@ -1331,17 +1510,28 @@ html_template = """<!DOCTYPE html>
       for (let i = 0; i < numNodes; i++) {
         const row = [];
         for (let j = 0; j < numNodes; j++) {
-          const dx = allNodes[i].x - allNodes[j].x;
-          const dy = allNodes[i].y - allNodes[j].y;
-          row.push(Math.sqrt(dx * dx + dy * dy));
+          if (i === j) {
+            row.push(0);
+          } else if (i === 0 && j > 0) {
+            // Warehouse -> Site j: EXACT user-specified distance!
+            row.push(DATA.customers[j - 1].distToDepot);
+          } else if (j === 0 && i > 0) {
+            // Site i -> Warehouse: EXACT user-specified distance!
+            row.push(DATA.customers[i - 1].distToDepot);
+          } else {
+            // Site i -> Site j
+            const dx = allNodes[i].x - allNodes[j].x;
+            const dy = allNodes[i].y - allNodes[j].y;
+            row.push(Math.sqrt(dx * dx + dy * dy));
+          }
         }
         newDistMatrix.push(row);
       }
       DATA.dist_matrix = newDistMatrix;
 
-      // Solve baseline NN for this custom scenario
+      // Solve baseline NN for this user scenario
       DATA.baseline = solveGreedyNN(DATA.depot, DATA.customers, DATA.capacity, DATA.dist_matrix);
-      DATA.ga_best = DATA.baseline; // initial placeholder until GA is run
+      DATA.ga_best = DATA.baseline;
 
       // Update Header Badges
       document.getElementById("badge-sites").innerHTML = `<i class="fa-solid fa-location-dot text-indigo-400 mr-1.5"></i>${DATA.customers.length} Delivery Sites`;
@@ -1361,7 +1551,7 @@ html_template = """<!DOCTYPE html>
         0,
         0,
         DATA.baseline.runtime_seconds,
-        "Custom Scenario (Baseline NN)",
+        "User Scenario (Baseline NN)",
         "N/A"
       );
 
@@ -1389,4 +1579,4 @@ with open(root / "index.html", "w", encoding="utf-8") as f:
 with open(root / "templates" / "index.html", "w", encoding="utf-8") as f:
     f.write(final_html)
 
-print("index.html successfully updated with Custom Delivery Scenario Builder, Distance Table, and Individual Truck Animation!")
+print("index.html compiled successfully with direct user input for distance from warehouse!")
