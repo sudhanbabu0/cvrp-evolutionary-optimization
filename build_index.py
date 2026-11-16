@@ -1,40 +1,53 @@
 """
 build_index.py
 Compiles the static client-side index.html for direct GitHub Pages deployment
-with direct user input for distance from warehouse to every delivery site,
-individual truck animation & inspection, medium animation speed controls,
-and academic assessment branding removed.
+and Flask local deployment, featuring:
+1. Interactive Canvas Map with smooth Zoom In/Out (+/- buttons, mouse wheel, pinch)
+   and Pan (click & drag to move in any direction, reset view).
+2. Direct user input for distance from warehouse to every delivery site.
+3. Full Workspace Save & Restore (Backend Server storage, Browser LocalStorage, and JSON File Export/Import).
+4. Individual truck animation & inspection, medium animation speed controls.
+5. Academic assessment branding completely removed.
 """
 
 import json
 from pathlib import Path
 
 root = Path(__file__).resolve().parent
-with open(root / "static_data.json", "r", encoding="utf-8") as f:
-    data_str = f.read()
 
-html_template = """<!DOCTYPE html>
+with open(root / "static_data.json", "r", encoding="utf-8") as f:
+    benchmark_data = json.load(f)
+
+data_str = json.dumps(benchmark_data, indent=2)
+
+html_template = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CVRP Evolutionary Computing Optimization Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
-    .canvas-container { position: relative; width: 100%; aspect-ratio: 1; max-width: 620px; }
-    canvas#routeCanvas { border-radius: 0.75rem; background: #0f172a; }
+    .canvas-container { position: relative; width: 100%; aspect-ratio: 1; max-width: 620px; overflow: hidden; border-radius: 0.75rem; }
+    canvas#routeCanvas { border-radius: 0.75rem; background: #0f172a; cursor: grab; user-select: none; }
+    canvas#routeCanvas:active { cursor: grabbing; }
     .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    @keyframes toast-in { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .toast-anim { animation: toast-in 0.25s ease-out forwards; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
   <!-- Top Navigation Bar -->
-  <header class="bg-slate-800/80 border-b border-slate-700/60 sticky top-0 z-50 backdrop-blur-md px-6 py-3.5">
+  <header class="bg-slate-800/80 border-b border-slate-700/60 sticky top-0 z-40 backdrop-blur-md px-6 py-3.5">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-lg">
@@ -49,18 +62,20 @@ html_template = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Problem Badges & Configuration Trigger -->
+      <!-- Action Buttons & Badges -->
       <div class="flex flex-wrap items-center gap-2 text-xs">
-        <button id="btn-open-scenario-modal" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1 rounded-md shadow-md shadow-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer">
+        <button id="btn-open-scenario-modal" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-md shadow-md shadow-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer">
           <i class="fa-solid fa-ruler-combined"></i> Set Distances & Trucks
+        </button>
+        <button id="btn-open-save-modal" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1.5 rounded-md shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-floppy-disk"></i> Save &amp; Load
         </button>
         <span id="badge-sites" class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-location-dot text-indigo-400 mr-1.5"></i>35 Delivery Sites</span>
         <span id="badge-depot" class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-warehouse text-amber-400 mr-1.5"></i>Warehouse (50, 50)</span>
         <span id="badge-capacity" class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-box text-cyan-400 mr-1.5"></i>Capacity Q = 100</span>
         <span id="badge-trucks" class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-truck text-emerald-400 mr-1.5"></i>Fleet Limit K = 8</span>
-        <span id="badge-demand" class="bg-slate-700/70 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50"><i class="fa-solid fa-weight-hanging text-purple-400 mr-1.5"></i>Demand: 580 u</span>
-        <a href="https://github.com/sudhanbabu0/cvrp-evolutionary-optimization" target="_blank" class="bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 px-2.5 py-1 rounded-md border border-indigo-500/40 transition">
-          <i class="fa-brands fa-github mr-1"></i>GitHub Repo
+        <a href="https://github.com/sudhanbabu0/cvrp-evolutionary-optimization" target="_blank" class="bg-slate-700/60 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-md border border-slate-600/50 transition">
+          <i class="fa-brands fa-github mr-1"></i>GitHub
         </a>
       </div>
     </div>
@@ -121,7 +136,6 @@ html_template = """<!DOCTYPE html>
                 <label for="select-truck-view" class="text-slate-300 font-medium">View:</label>
                 <select id="select-truck-view" class="bg-slate-800 text-slate-100 rounded px-2 py-0.5 text-xs border border-slate-600 outline-none cursor-pointer">
                   <option value="all">All Trucks (Simultaneous)</option>
-                  <!-- Individual trucks populated dynamically -->
                 </select>
               </div>
 
@@ -142,9 +156,31 @@ html_template = """<!DOCTYPE html>
             </button>
           </div>
 
-          <!-- Canvas Element -->
+          <!-- Canvas Element with Floating Zoom & Pan Controls -->
           <div class="canvas-container mx-auto">
             <canvas id="routeCanvas" width="600" height="600" class="w-full h-full shadow-2xl"></canvas>
+
+            <!-- Floating Zoom & Pan Toolbar (Top-Right) -->
+            <div class="absolute top-3 right-3 flex flex-col items-center gap-1.5 bg-slate-900/85 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/80 shadow-2xl z-20">
+              <button id="btn-zoom-in" title="Zoom In (Scroll Up)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-emerald-400 flex items-center justify-center transition text-sm cursor-pointer border border-slate-700 active:scale-95">
+                <i class="fa-solid fa-plus"></i>
+              </button>
+              <div id="zoom-level-badge" class="text-[11px] font-mono text-emerald-400 font-bold py-0.5 select-none text-center min-w-[36px]">
+                100%
+              </div>
+              <button id="btn-zoom-out" title="Zoom Out (Scroll Down)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-emerald-400 flex items-center justify-center transition text-sm cursor-pointer border border-slate-700 active:scale-95">
+                <i class="fa-solid fa-minus"></i>
+              </button>
+              <button id="btn-zoom-reset" title="Reset View (Center & 100%)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-400 flex items-center justify-center transition text-xs cursor-pointer border border-slate-700 active:scale-95">
+                <i class="fa-solid fa-arrows-to-dot"></i>
+              </button>
+            </div>
+
+            <!-- Floating Pan Instruction Badge (Bottom-Left) -->
+            <div class="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-700/60 text-[11px] text-slate-400 pointer-events-none flex items-center gap-1.5 select-none">
+              <i class="fa-solid fa-up-down-left-right text-indigo-400 text-xs"></i>
+              <span>Drag to move &bull; Scroll to zoom</span>
+            </div>
           </div>
         </div>
 
@@ -180,9 +216,9 @@ html_template = """<!DOCTYPE html>
       <!-- Right Column: Controls & Real-Time Convergence Chart (5 cols) -->
       <div class="lg:col-span-5 space-y-6">
 
-        <!-- Controls Box -->
-        <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl space-y-4">
-          <div class="flex items-center justify-between">
+        <!-- Optimization Controls Card -->
+        <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl">
+          <div class="flex items-center justify-between mb-4">
             <h2 class="text-base font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-sliders text-emerald-400"></i>
               Optimization Controls
@@ -192,91 +228,80 @@ html_template = """<!DOCTYPE html>
             </button>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
-            <button id="btn-run-baseline" class="w-full py-2.5 px-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer">
-              <i class="fa-solid fa-bolt"></i> Run Baseline (NN)
-            </button>
-            <button id="btn-load-best" class="w-full py-2.5 px-3 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer">
-              <i class="fa-solid fa-trophy"></i> Load Benchmark Best
-            </button>
-          </div>
-
-          <!-- Parameter Sliders -->
-          <div class="space-y-3 pt-2 text-xs">
+          <div class="space-y-4 text-xs">
+            <!-- Population Size -->
             <div>
-              <div class="flex justify-between text-slate-300 mb-1">
-                <span>Population Size (P):</span>
-                <span id="val-pop-size" class="font-bold text-indigo-400">100</span>
+              <div class="flex justify-between font-medium mb-1">
+                <span class="text-slate-300">Population Size (N_pop):</span>
+                <span id="val-pop-size" class="text-emerald-400 font-mono font-bold">100</span>
               </div>
-              <input type="range" id="input-pop-size" min="40" max="200" step="20" value="100" class="w-full accent-indigo-500 cursor-pointer">
-              <div class="flex justify-between text-[10px] text-slate-500"><span>40 (Fast)</span><span>100 (Default)</span><span>200 (Thorough)</span></div>
+              <input type="range" id="input-pop-size" min="30" max="200" step="10" value="100" class="w-full accent-emerald-500 cursor-pointer">
             </div>
 
+            <!-- Mutation Rate -->
             <div>
-              <div class="flex justify-between text-slate-300 mb-1">
-                <span>Mutation Rate (pm):</span>
-                <span id="val-mut-rate" class="font-bold text-indigo-400">0.08</span>
+              <div class="flex justify-between font-medium mb-1">
+                <span class="text-slate-300">Mutation Rate (p_m):</span>
+                <span id="val-mut-rate" class="text-cyan-400 font-mono font-bold">0.15</span>
               </div>
-              <input type="range" id="input-mut-rate" min="0.01" max="0.20" step="0.01" value="0.08" class="w-full accent-indigo-500 cursor-pointer">
-              <div class="flex justify-between text-[10px] text-slate-500"><span>0.01 (Low)</span><span>0.08 (Optimal)</span><span>0.20 (High)</span></div>
+              <input type="range" id="input-mut-rate" min="0.01" max="0.30" step="0.01" value="0.15" class="w-full accent-cyan-500 cursor-pointer">
             </div>
 
+            <!-- Crossover Rate & Max Generations -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-slate-300 mb-1">Crossover Rate (pc):</label>
-                <select id="select-crossover" class="w-full bg-slate-700/80 border border-slate-600 rounded-lg p-2 text-slate-200">
-                  <option value="0.60">0.60 (Low)</option>
-                  <option value="0.85" selected>0.85 (Optimal)</option>
+                <label class="block text-slate-300 font-medium mb-1">Crossover Rate (p_c):</label>
+                <select id="select-cr-rate" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 outline-none">
+                  <option value="0.75">0.75 (Low)</option>
+                  <option value="0.85" selected>0.85 (Recommended)</option>
                   <option value="0.95">0.95 (High)</option>
                 </select>
               </div>
               <div>
-                <label class="block text-slate-300 mb-1">Max Generations:</label>
-                <select id="select-generations" class="w-full bg-slate-700/80 border border-slate-600 rounded-lg p-2 text-slate-200">
-                  <option value="60">60 Gens</option>
-                  <option value="120" selected>120 Gens</option>
-                  <option value="200">200 Gens</option>
-                </select>
+                <label class="block text-slate-300 font-medium mb-1">Max Generations:</label>
+                <input type="number" id="input-generations" value="150" min="20" max="300" step="10" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 font-mono">
               </div>
             </div>
 
+            <!-- Selection Strategy -->
             <div>
-              <label class="block text-slate-300 mb-1">Selection Strategy:</label>
-              <select id="select-selection" class="w-full bg-slate-700/80 border border-slate-600 rounded-lg p-2 text-slate-200">
-                <option value="tournament" selected>Tournament Selection (k=3)</option>
-                <option value="roulette">Roulette Wheel Selection</option>
+              <label class="block text-slate-300 font-medium mb-1">Selection Strategy:</label>
+              <select id="select-selection" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 outline-none">
+                <option value="tournament" selected>Tournament Selection (k=3, Elitism=2)</option>
+                <option value="roulette">Roulette Wheel (Fitness Proportionate)</option>
               </select>
             </div>
-          </div>
 
-          <!-- Run GA Button -->
-          <button id="btn-run-ga" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition cursor-pointer">
-            <i class="fa-solid fa-dna"></i> Run Genetic Algorithm Live
-          </button>
+            <!-- Run Button -->
+            <button id="btn-run-ga" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2 cursor-pointer text-sm">
+              <i class="fa-solid fa-dna"></i> Run Evolutionary Algorithm
+            </button>
+          </div>
         </div>
 
-        <!-- Real-Time Convergence Chart -->
-        <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl space-y-3">
-          <div class="flex items-center justify-between">
+        <!-- Real-Time Convergence Chart Card -->
+        <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl">
+          <div class="flex items-center justify-between mb-3">
             <h2 class="text-base font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-chart-line text-cyan-400"></i>
-              Convergence Trajectory
+              Convergence History
             </h2>
-            <span class="text-[11px] text-slate-400">Generations vs. Distance</span>
+            <span class="text-xs text-slate-400">Dual-Axis Fitness</span>
           </div>
-          <div class="h-48 w-full">
+          <div class="h-56">
             <canvas id="convergenceChart"></canvas>
           </div>
         </div>
 
       </div>
+
     </div>
 
-    <!-- Vehicle Route Partitions & Load Breakdown -->
+    <!-- Active Route Breakdown Cards -->
     <div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-2xl space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-base font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-route text-purple-400"></i>
+          <i class="fa-solid fa-route text-indigo-400"></i>
           Dispatched Vehicle Route Sequences & Payload Breakdown
         </h2>
         <span id="route-count-badge" class="text-xs bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-md border border-indigo-500/30 font-semibold">6 Active Trucks</span>
@@ -353,7 +378,7 @@ html_template = """<!DOCTYPE html>
             </div>
           </div>
 
-          <!-- Bulk Distance Input (Type or Paste all distances directly) -->
+          <!-- Bulk Distance Input -->
           <div class="pt-2 border-t border-slate-700/60 flex flex-wrap items-center gap-2">
             <span class="text-slate-300 font-semibold"><i class="fa-solid fa-paste text-amber-400 mr-1"></i>Bulk Enter Distances (km):</span>
             <input type="text" id="input-bulk-distances" placeholder="e.g. 15.2, 28.5, 42.0, 18.7, 33.1, 24.0..." class="flex-1 min-w-[240px] bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-mono">
@@ -368,71 +393,209 @@ html_template = """<!DOCTYPE html>
           <div class="flex items-center justify-between mb-2">
             <h4 class="font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-table-list text-cyan-400"></i>
-              Interactive Delivery Sites & Distance from Warehouse Table
+              Delivery Sites &amp; User-Specified Distance Table
             </h4>
-            <span id="custom-sites-count" class="text-emerald-400 font-semibold">35 Sites Configured &bull; Total Demand: 580 units</span>
+            <span id="custom-sites-count" class="text-emerald-400 font-semibold">35 Sites Configured | Total Demand: 580 units</span>
           </div>
 
-          <div class="max-h-72 overflow-y-auto custom-scroll border border-slate-700 rounded-xl bg-slate-950">
-            <table class="w-full text-left border-collapse">
-              <thead class="bg-slate-800 text-slate-300 sticky top-0 border-b border-slate-700 shadow-md">
-                <tr>
-                  <th class="p-2.5 text-center">Site #</th>
-                  <th class="p-2.5 text-emerald-400 font-bold bg-emerald-950/40 border-l border-r border-emerald-500/30">
-                    <i class="fa-solid fa-ruler mr-1.5"></i>Distance from Warehouse (km) <span class="text-[10px] text-emerald-300 font-normal">[EDITABLE]</span>
-                  </th>
-                  <th class="p-2.5">Direction Angle (°)</th>
-                  <th class="p-2.5">X, Y Position (km)</th>
-                  <th class="p-2.5">Parcel Demand (units)</th>
-                  <th class="p-2.5 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody id="custom-sites-tbody" class="divide-y divide-slate-800 font-mono text-slate-300">
-                <!-- Dynamically populated rows -->
-              </tbody>
-            </table>
+          <div class="border border-slate-700/80 rounded-xl overflow-hidden">
+            <div class="max-h-72 overflow-y-auto custom-scroll">
+              <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-800 text-slate-300 text-[11px] uppercase sticky top-0 z-10">
+                  <tr>
+                    <th class="p-2.5">Site #</th>
+                    <th class="p-2.5 text-emerald-400"><i class="fa-solid fa-ruler-horizontal mr-1"></i>Dist from Warehouse (km) [USER INPUT]</th>
+                    <th class="p-2.5">Angle (&deg;)</th>
+                    <th class="p-2.5">Coord X (km)</th>
+                    <th class="p-2.5">Coord Y (km)</th>
+                    <th class="p-2.5">Demand (units)</th>
+                    <th class="p-2.5 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="custom-sites-tbody" class="divide-y divide-slate-800 text-slate-200">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
       </div>
 
       <!-- Modal Footer -->
-      <div class="p-4 border-t border-slate-800 bg-slate-850 flex items-center justify-between">
-        <span class="text-xs text-slate-400"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>Distances entered are applied directly to the distance matrix and fleet optimizer.</span>
-        <div class="flex items-center space-x-3">
-          <button id="btn-cancel-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition cursor-pointer">
+      <div class="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-850">
+        <span class="text-slate-400 text-xs">
+          <i class="fa-solid fa-circle-info text-indigo-400 mr-1"></i>
+          Distances entered here directly set the distance matrix from the central warehouse.
+        </span>
+        <div class="flex items-center space-x-2">
+          <button id="btn-cancel-scenario" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-xl transition cursor-pointer">
             Cancel
           </button>
-          <button id="btn-apply-scenario" class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/20 transition cursor-pointer">
-            <i class="fa-solid fa-check mr-1.5"></i> Apply User Inputs & Optimize Routes
+          <button id="btn-apply-scenario" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-5 py-2 rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-check"></i> Apply Distances &amp; Recalculate Routes
           </button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Embedded Static & Evolutionary Engine Script -->
+  <!-- ============================================================ -->
+  <!-- MODAL: Save Everything & Restore Workspace (Backend + Local)  -->
+  <!-- ============================================================ -->
+  <div id="modal-save-load" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Header -->
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-850">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-floppy-disk text-indigo-400"></i>
+            Save &amp; Restore Complete Workspace
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Save all delivery sites, warehouse distances, truck fleet, routes, and optimization results.</p>
+        </div>
+        <button id="btn-close-save-modal" class="text-slate-400 hover:text-white text-lg p-1 transition cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-5 space-y-5 overflow-y-auto custom-scroll text-xs">
+
+        <!-- Card 1: Save Current Workspace -->
+        <div class="p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl space-y-3">
+          <h4 class="font-bold text-white text-sm flex items-center gap-2">
+            <i class="fa-solid fa-arrow-down-to-bracket text-emerald-400"></i>
+            Save Current State
+          </h4>
+          <p class="text-slate-400">Save your current setup, custom distances, trucks, and optimized route results:</p>
+          
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="text" id="input-save-name" placeholder="Scenario Name (e.g. North-Zone-Logistics-35)" class="flex-1 min-w-[240px] bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+            <!-- 1. Download File -->
+            <button id="btn-action-export-json" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-file-arrow-down"></i> Export JSON File
+            </button>
+            <!-- 2. Save to Browser -->
+            <button id="btn-action-save-browser" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-database"></i> Save to Browser
+            </button>
+            <!-- 3. Save to Backend Server -->
+            <button id="btn-action-save-backend" class="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-server"></i> Save to Backend Disk
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: Restore from JSON File -->
+        <div class="p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl space-y-3">
+          <h4 class="font-bold text-white text-sm flex items-center gap-2">
+            <i class="fa-solid fa-file-import text-cyan-400"></i>
+            Import / Restore from JSON File
+          </h4>
+          <p class="text-slate-400">Upload any previously saved CVRP workspace file to restore all delivery sites, distances, trucks, and route solutions immediately:</p>
+          
+          <div class="flex items-center space-x-3">
+            <input type="file" id="file-import-input" accept=".json" class="hidden">
+            <button id="btn-trigger-file-import" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg border border-slate-600 transition flex items-center gap-2 cursor-pointer font-semibold">
+              <i class="fa-solid fa-upload text-cyan-400"></i> Choose JSON File to Restore
+            </button>
+            <span id="file-import-status" class="text-slate-400 italic">No file chosen</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Saved Items List (Browser + Backend) -->
+        <div class="p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-bold text-white text-sm flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+              Saved Workspaces List
+            </h4>
+            <button id="btn-refresh-saved-list" class="text-[11px] text-slate-400 hover:text-white transition cursor-pointer flex items-center gap-1">
+              <i class="fa-solid fa-rotate mr-0.5"></i> Refresh
+            </button>
+          </div>
+
+          <!-- Saved Scenarios Table -->
+          <div class="border border-slate-700/70 rounded-lg overflow-hidden">
+            <div class="max-h-48 overflow-y-auto custom-scroll">
+              <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-850 text-slate-400 text-[11px] uppercase">
+                  <tr>
+                    <th class="p-2">Name</th>
+                    <th class="p-2">Location</th>
+                    <th class="p-2">Sites</th>
+                    <th class="p-2">Distance</th>
+                    <th class="p-2">Saved At</th>
+                    <th class="p-2 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="saved-items-tbody" class="divide-y divide-slate-800 text-slate-200">
+                  <tr>
+                    <td colspan="6" class="p-3 text-center text-slate-500 italic">No saved workspaces yet. Save one above!</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="p-4 border-t border-slate-800 flex items-center justify-end bg-slate-850">
+        <button id="btn-done-save-modal" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-5 py-2 rounded-xl transition cursor-pointer">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Embedded Benchmark Data & Scripts -->
   <script>
     const INITIAL_BENCHMARK_DATA = __DATA_PLACEHOLDER__;
 
-    // Working active data copy (can be customized by user)
-    let DATA = JSON.parse(JSON.stringify(INITIAL_BENCHMARK_DATA));
-
+    // Palette for routes
     const COLORS = [
-      "#38bdf8", "#fb923c", "#4ade80", "#f87171", "#c084fc",
-      "#f472b6", "#a3e635", "#fbbf24", "#2dd4bf", "#818cf8",
-      "#e879f9", "#34d399", "#60a5fa", "#f59e0b", "#ec4899"
+      "#38bdf8", "#34d399", "#fbbf24", "#f472b6",
+      "#a78bfa", "#f87171", "#fb923c", "#4ade80",
+      "#818cf8", "#e879f9", "#2dd4bf", "#facc15"
     ];
 
-    let currentRoutes = DATA.ga_best.routes;
-    let currentView = "ga"; // "ga" or "baseline"
-    let selectedTruck = "all"; // "all" or 0, 1, 2...
-    let isAnimating = false;
-    let animationId = null;
-    let animProgress = 0;
-    let animationSpeedStep = 0.0022; // Medium speed default (clearly visible)
-    let chartInstance = null;
+    // Global Interactive State
+    let DATA = JSON.parse(JSON.stringify(INITIAL_BENCHMARK_DATA));
 
+    // Augment initial customers with polar coordinates
+    DATA.customers.forEach(c => {
+      const dx = c.x - DATA.depot.x;
+      const dy = c.y - DATA.depot.y;
+      c.distToDepot = parseFloat(Math.sqrt(dx * dx + dy * dy).toFixed(1));
+      c.angle = Math.round((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360);
+    });
+
+    let currentRoutes = DATA.ga_best ? DATA.ga_best.routes : [];
+    let currentSolver = "Genetic Algorithm";
+    let currentView = "ga";
+    let selectedTruck = "all";
+
+    // Animation Speed: medium default
+    let animationSpeedStep = 0.0035;
+    let animProgress = 0;
+    let isAnimating = true;
+    let animationId = null;
+
+    // ============================================================
+    // CANVAS ZOOM & PAN STATE
+    // ============================================================
+    let mapZoom = 1.0;
+    let mapPan = { x: 0, y: 0 };
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+
+    let chartInstance = null;
     const canvas = document.getElementById("routeCanvas");
     const ctx = canvas.getContext("2d");
 
@@ -451,22 +614,158 @@ html_template = """<!DOCTYPE html>
           b.className = "btn-speed px-2 py-0.5 rounded text-[11px] transition text-slate-300 hover:text-white cursor-pointer";
         });
         btn.className = "btn-speed px-2 py-0.5 rounded text-[11px] transition bg-indigo-600 text-white font-bold cursor-pointer";
-
-        const sp = btn.getAttribute("data-speed");
-        if (sp === "slow") animationSpeedStep = 0.0010;
-        else if (sp === "medium") animationSpeedStep = 0.0022; // Smooth medium
-        else if (sp === "fast") animationSpeedStep = 0.0055;
+        const sp = btn.dataset.speed;
+        if (sp === "slow") animationSpeedStep = 0.0018;
+        else if (sp === "medium") animationSpeedStep = 0.0035;
+        else if (sp === "fast") animationSpeedStep = 0.0075;
       });
     });
 
-    // Coordinate Mapping: [0, 100] -> Canvas
+    // ============================================================
+    // COORDINATE MAPPING WITH ZOOM & PAN
+    // ============================================================
     function toCanvas(x, y) {
-      const margin = 40;
+      const margin = 45;
       const usable = canvas.width - margin * 2;
+      // Unscaled base coordinates
+      const cx0 = margin + (x / 100) * usable;
+      const cy0 = canvas.height - (margin + (y / 100) * usable);
+      // Center of canvas
+      const midX = canvas.width / 2;
+      const midY = canvas.height / 2;
       return {
-        cx: margin + (x / 100) * usable,
-        cy: canvas.height - (margin + (y / 100) * usable)
+        cx: midX + (cx0 - midX) * mapZoom + mapPan.x,
+        cy: midY + (cy0 - midY) * mapZoom + mapPan.y
       };
+    }
+
+    function updateZoomUI() {
+      const pct = Math.round(mapZoom * 100);
+      document.getElementById("zoom-level-badge").textContent = `${pct}%`;
+    }
+
+    // Zoom Buttons
+    document.getElementById("btn-zoom-in").addEventListener("click", () => {
+      mapZoom = Math.min(5.0, parseFloat((mapZoom * 1.25).toFixed(2)));
+      updateZoomUI();
+      if (!isAnimating) drawMap();
+    });
+
+    document.getElementById("btn-zoom-out").addEventListener("click", () => {
+      mapZoom = Math.max(0.4, parseFloat((mapZoom / 1.25).toFixed(2)));
+      updateZoomUI();
+      if (!isAnimating) drawMap();
+    });
+
+    document.getElementById("btn-zoom-reset").addEventListener("click", () => {
+      mapZoom = 1.0;
+      mapPan = { x: 0, y: 0 };
+      updateZoomUI();
+      if (!isAnimating) drawMap();
+    });
+
+    // Mouse Wheel Zoom centered on cursor
+    canvas.addEventListener("wheel", e => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      const oldZoom = mapZoom;
+      const newZoom = Math.max(0.4, Math.min(5.0, mapZoom * zoomFactor));
+
+      mapPan.x = mouseX - (mouseX - mapPan.x) * (newZoom / oldZoom);
+      mapPan.y = mouseY - (mouseY - mapPan.y) * (newZoom / oldZoom);
+      mapZoom = newZoom;
+
+      updateZoomUI();
+      if (!isAnimating) drawMap();
+    }, { passive: false });
+
+    // Click & Drag to Move (Pan)
+    canvas.addEventListener("mousedown", e => {
+      isDragging = true;
+      dragStart = { x: e.clientX - mapPan.x, y: e.clientY - mapPan.y };
+      canvas.style.cursor = "grabbing";
+    });
+
+    window.addEventListener("mousemove", e => {
+      if (!isDragging) return;
+      mapPan.x = e.clientX - dragStart.x;
+      mapPan.y = e.clientY - dragStart.y;
+      if (!isAnimating) drawMap();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (isDragging) {
+        isDragging = false;
+        canvas.style.cursor = "grab";
+      }
+    });
+
+    // Touch Support for Mobile / Touchscreen Panning
+    let touchStartDist = 0;
+    canvas.addEventListener("touchstart", e => {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        dragStart = { x: e.touches[0].clientX - mapPan.x, y: e.touches[0].clientY - mapPan.y };
+      } else if (e.touches.length === 2) {
+        isDragging = false;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        touchStartDist = Math.sqrt(dx * dx + dy * dy);
+      }
+    }, { passive: true });
+
+    canvas.addEventListener("touchmove", e => {
+      if (e.touches.length === 1 && isDragging) {
+        mapPan.x = e.touches[0].clientX - dragStart.x;
+        mapPan.y = e.touches[0].clientY - dragStart.y;
+        if (!isAnimating) drawMap();
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (touchStartDist > 0) {
+          const factor = dist / touchStartDist;
+          mapZoom = Math.max(0.4, Math.min(5.0, mapZoom * factor));
+          touchStartDist = dist;
+          updateZoomUI();
+          if (!isAnimating) drawMap();
+        }
+      }
+    }, { passive: true });
+
+    canvas.addEventListener("touchend", () => {
+      isDragging = false;
+      touchStartDist = 0;
+    }, { passive: true });
+
+    // Double-click resets view
+    canvas.addEventListener("dblclick", () => {
+      mapZoom = 1.0;
+      mapPan = { x: 0, y: 0 };
+      updateZoomUI();
+      if (!isAnimating) drawMap();
+    });
+
+    // ============================================================
+    // TOAST NOTIFICATIONS
+    // ============================================================
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      const bg = type === "success" ? "bg-emerald-600" : (type === "error" ? "bg-red-600" : "bg-indigo-600");
+      const icon = type === "success" ? "fa-circle-check" : (type === "error" ? "fa-circle-exclamation" : "fa-info");
+      toast.className = `${bg} text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold toast-anim`;
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity 0.3s";
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
     }
 
     // Populate Individual Truck Selector Dropdown
@@ -530,11 +829,11 @@ html_template = """<!DOCTYPE html>
       drawMap();
     });
 
-    // Draw Map on Canvas (With Individual Truck Focus Mode)
+    // Draw Map on Canvas with Zoom & Pan Transformations
     function drawMap() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Gridlines
+      // Gridlines transformed with Zoom & Pan
       ctx.strokeStyle = "#1e293b";
       ctx.lineWidth = 1;
       for (let i = 0; i <= 100; i += 20) {
@@ -621,7 +920,7 @@ html_template = """<!DOCTYPE html>
       ctx.fillText("0", dPt.cx, dPt.cy);
     }
 
-    // Smooth Medium-Speed Animation Loop (Supports Individual Truck Focus)
+    // Animation Loop
     function animate() {
       drawMap();
 
@@ -631,7 +930,7 @@ html_template = """<!DOCTYPE html>
 
         currentRoutes.forEach((route, rIdx) => {
           if (selectedTruck !== "all" && parseInt(selectedTruck) !== rIdx) {
-            return; // Only animate selected truck when focused!
+            return;
           }
 
           const col = COLORS[rIdx % COLORS.length];
@@ -694,102 +993,111 @@ html_template = """<!DOCTYPE html>
       drawMap();
     });
 
-    // Update Metrics
+    // Update Metrics Display
     function updateMetrics(baseDist, gaDist, vans, saveDist, savePct, runtime, solver, convGen) {
       document.getElementById("metric-baseline-dist").innerHTML = `${parseFloat(baseDist).toFixed(2)} <span class="text-xs text-slate-400">km</span>`;
       document.getElementById("metric-ga-dist").innerHTML = `${parseFloat(gaDist).toFixed(2)} <span class="text-xs text-slate-400">km</span>`;
-      document.getElementById("metric-ga-fleet").innerHTML = `${vans} Trucks &bull; Converged Gen ${convGen}`;
       document.getElementById("metric-savings-dist").innerHTML = `${parseFloat(saveDist).toFixed(2)} <span class="text-xs text-slate-400">km</span>`;
       document.getElementById("metric-savings-pct").innerHTML = `<i class="fa-solid fa-arrow-down mr-1"></i>${parseFloat(savePct).toFixed(2)}% Reduction`;
-      
-      const baselineVans = DATA.baseline ? DATA.baseline.vehicles_utilized : vans;
-      const vanDiff = vans - baselineVans;
-      document.getElementById("metric-fleet-saving").textContent = `${vanDiff <= 0 ? vanDiff : '+' + vanDiff} Truck(s)`;
-      
+      document.getElementById("metric-runtime").innerHTML = `${parseFloat(runtime).toFixed(3)} <span class="text-xs text-slate-400">s</span>`;
+      document.getElementById("metric-solver-type").textContent = solver;
+
       const minVans = Math.ceil(DATA.total_demand / DATA.capacity);
       document.getElementById("metric-fleet-min").textContent = `Theoretical Min: ${minVans} Trucks`;
-      
-      document.getElementById("metric-runtime").innerHTML = `${runtime} <span class="text-xs text-slate-400">s</span>`;
-      document.getElementById("metric-solver-type").textContent = solver;
-      document.getElementById("route-count-badge").textContent = `${vans} Active Trucks`;
+      document.getElementById("metric-ga-fleet").textContent = `${vans} Trucks | Converged Gen ${convGen || 108}`;
+      const diff = 7 - vans;
+      document.getElementById("metric-fleet-saving").textContent = diff >= 0 ? `-${diff} Trucks` : `+${Math.abs(diff)} Trucks`;
     }
 
-    // Render Route Cards (Clicking a card focuses that truck!)
-    function renderRouteCards(routes, demands, dists) {
+    // Render Route Cards
+    function renderRouteCards(routes, demands, distances) {
       const container = document.getElementById("route-cards-container");
       container.innerHTML = "";
+      document.getElementById("route-count-badge").textContent = `${routes.length} Active Trucks`;
 
       routes.forEach((route, idx) => {
         const col = COLORS[idx % COLORS.length];
-        const dem = demands ? demands[idx] : 0;
-        const dst = dists ? dists[idx] : 0;
-        const pct = Math.min(100, Math.round((dem / DATA.capacity) * 100));
+        const load = demands[idx];
+        const dist = distances[idx];
+        const pct = Math.min(100, Math.round((load / DATA.capacity) * 100));
 
         const card = document.createElement("div");
-        card.className = "bg-slate-900/80 border border-slate-700/60 p-3.5 rounded-xl space-y-2 hover:border-indigo-500/60 transition cursor-pointer";
+        card.className = "bg-slate-900/80 border border-slate-700/60 p-4 rounded-xl flex flex-col justify-between hover:border-slate-600 transition";
         card.innerHTML = `
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-bold flex items-center gap-1.5" style="color: ${col};">
-              <i class="fa-solid fa-truck"></i> Truck ${idx + 1}
-            </span>
-            <span class="text-slate-400 font-mono">${dst} km</span>
-          </div>
           <div>
-            <div class="flex justify-between text-[11px] text-slate-400 mb-1">
-              <span>Load: <b class="text-white">${dem}</b>/${DATA.capacity} units</span>
-              <span>${pct}%</span>
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-xs px-2.5 py-0.5 rounded-full text-white" style="background-color: ${col};">
+                <i class="fa-solid fa-truck mr-1"></i>Truck ${idx + 1}
+              </span>
+              <span class="text-slate-400 text-xs font-mono">${dist.toFixed(1)} km</span>
             </div>
-            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-              <div class="h-full rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${col};"></div>
+            <div class="mb-2">
+              <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                <span>Payload Utilization</span>
+                <span class="font-bold text-slate-200">${load} / ${DATA.capacity} u (${pct}%)</span>
+              </div>
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${col};"></div>
+              </div>
             </div>
-          </div>
-          <div class="text-[10px] text-slate-400 truncate font-mono bg-slate-800/60 px-2 py-1 rounded">
-            ${route.join(" → ")}
-          </div>
-          <div class="pt-1 flex justify-end">
-            <span class="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 hover:underline">
-              <i class="fa-solid fa-eye"></i> View Single Truck Animation
-            </span>
+            <div class="text-[11px] text-slate-400">
+              <span class="text-slate-500 font-semibold">Stops (${route.length - 2}):</span>
+              <span class="font-mono text-slate-300 ml-1">${route.slice(1, -1).join(" &rarr; ")}</span>
+            </div>
           </div>
         `;
-
-        card.addEventListener("click", () => {
-          selectedTruck = idx;
-          document.getElementById("select-truck-view").value = idx;
-          updateActiveTruckBanner();
-          drawMap();
-        });
-
         container.appendChild(card);
       });
     }
 
-    // Chart Handling
+    // Chart.js Convergence Chart
     function initChart() {
-      const c = document.getElementById("convergenceChart").getContext("2d");
-      const gens = Array.from({length: 40}, (_, i) => i * 2);
-      const dists = gens.map(g => 727 + 600 * Math.exp(-g / 10));
-
-      chartInstance = new Chart(c, {
+      const chartCtx = document.getElementById("convergenceChart").getContext("2d");
+      chartInstance = new Chart(chartCtx, {
         type: "line",
         data: {
-          labels: gens,
-          datasets: [{
-            label: "Best Distance (km)",
-            data: dists,
-            borderColor: "#38bdf8",
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.2
-          }]
+          labels: [],
+          datasets: [
+            {
+              label: "Best Distance (km)",
+              data: [],
+              borderColor: "#10b981",
+              backgroundColor: "rgba(16, 185, 129, 0.1)",
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.2,
+              yAxisID: "y"
+            },
+            {
+              label: "Average Distance (km)",
+              data: [],
+              borderColor: "#64748b",
+              borderDash: [4, 4],
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.2,
+              yAxisID: "y"
+            }
+          ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          interaction: { mode: "index", intersect: false },
           scales: {
-            x: { grid: { color: "#1e293b" }, ticks: { color: "#94a3b8", font: { size: 10 } } },
-            y: { grid: { color: "#1e293b" }, ticks: { color: "#94a3b8", font: { size: 10 } } }
+            x: {
+              title: { display: true, text: "Generation", color: "#94a3b8", font: { size: 10 } },
+              grid: { color: "#1e293b" },
+              ticks: { color: "#64748b", font: { size: 9 }, maxTicksLimit: 8 }
+            },
+            y: {
+              title: { display: true, text: "Total Distance (km)", color: "#94a3b8", font: { size: 10 } },
+              grid: { color: "#1e293b" },
+              ticks: { color: "#64748b", font: { size: 9 } }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: "#cbd5e1", font: { size: 10 } } }
           }
         }
       });
@@ -798,369 +1106,374 @@ html_template = """<!DOCTYPE html>
     function updateChart(history) {
       if (!chartInstance) return;
       chartInstance.data.labels = history.generation;
-      chartInstance.data.datasets = [
-        {
-          label: "Best Distance (km)",
-          data: history.best_distance,
-          borderColor: "#38bdf8",
-          borderWidth: 2.5,
-          pointRadius: 0,
-          tension: 0.1
-        },
-        {
-          label: "Average Distance (km)",
-          data: history.avg_distance,
-          borderColor: "#64748b",
-          borderWidth: 1.5,
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0.1
-        }
-      ];
+      chartInstance.data.datasets[0].data = history.best_distance;
+      chartInstance.data.datasets[1].data = history.avg_distance;
       chartInstance.update();
     }
 
-    // Load Benchmark Best
-    function loadGlobalBest() {
-      currentView = "ga";
-      currentRoutes = DATA.ga_best ? DATA.ga_best.routes : DATA.baseline.routes;
-      const baseDist = DATA.baseline ? DATA.baseline.total_distance_km : 1036.59;
-      const gaDist = DATA.ga_best ? DATA.ga_best.total_distance_km : baseDist;
-      const vans = DATA.ga_best ? DATA.ga_best.vehicles_utilized : DATA.baseline.vehicles_utilized;
-
-      updateMetrics(
-        baseDist,
-        gaDist,
-        vans,
-        baseDist - gaDist,
-        ((baseDist - gaDist) / baseDist) * 100,
-        DATA.ga_best ? DATA.ga_best.runtime_seconds : 0.8,
-        "Optimal Benchmark Solution",
-        DATA.ga_best ? DATA.ga_best.generation_converged : 108
-      );
-      renderRouteCards(currentRoutes, DATA.ga_best.route_demands, DATA.ga_best.route_distances_km);
-      updateTruckSelector();
-      drawMap();
-    }
-
-    // Run Baseline
-    function runBaseline() {
-      currentView = "baseline";
-      currentRoutes = DATA.baseline.routes;
-      updateMetrics(
-        DATA.baseline.total_distance_km,
-        DATA.baseline.total_distance_km,
-        DATA.baseline.vehicles_utilized,
-        0,
-        0,
-        DATA.baseline.runtime_seconds || 0.0004,
-        "Greedy Nearest-Neighbor",
-        "N/A"
-      );
-      renderRouteCards(DATA.baseline.routes, DATA.baseline.route_demands, DATA.baseline.route_distances_km);
-      updateTruckSelector();
-      drawMap();
-    }
-
-    document.getElementById("btn-load-best").addEventListener("click", loadGlobalBest);
-    document.getElementById("btn-run-baseline").addEventListener("click", runBaseline);
-
+    // Toggle baseline vs GA view
     document.getElementById("btn-toggle-view").addEventListener("click", () => {
+      const btn = document.getElementById("btn-toggle-view");
       if (currentView === "ga") {
-        runBaseline();
-        document.getElementById("btn-toggle-view").innerHTML = '<i class="fa-solid fa-shuffle text-emerald-400"></i> Switch to GA Map';
+        currentView = "baseline";
+        currentRoutes = DATA.baseline.routes;
+        btn.innerHTML = '<i class="fa-solid fa-dna text-emerald-400"></i> Switch to GA Best';
+        renderRouteCards(DATA.baseline.routes, DATA.baseline.route_demands, DATA.baseline.route_distances_km);
       } else {
-        loadGlobalBest();
-        document.getElementById("btn-toggle-view").innerHTML = '<i class="fa-solid fa-shuffle text-cyan-400"></i> Switch to Baseline Map';
+        currentView = "ga";
+        currentRoutes = DATA.ga_best.routes;
+        btn.innerHTML = '<i class="fa-solid fa-shuffle text-cyan-400"></i> Switch to Baseline';
+        renderRouteCards(DATA.ga_best.routes, DATA.ga_best.route_demands, DATA.ga_best.route_distances_km);
       }
+      updateTruckSelector();
+      drawMap();
     });
 
-    // ==========================================
-    // CLIENT-SIDE GENETIC ALGORITHM ENGINE
-    // ==========================================
-    function decodeRoutes(chrom) {
-      const routes = [];
-      let curRoute = [0];
-      let curLoad = 0;
-
-      for (let i = 0; i < chrom.length; i++) {
-        const cId = chrom[i];
-        const cust = DATA.customers.find(c => c.id === cId);
-        const dem = cust ? cust.demand : 15;
-        if (curLoad + dem <= DATA.capacity) {
-          curRoute.push(cId);
-          curLoad += dem;
-        } else {
-          curRoute.push(0);
-          routes.push(curRoute);
-          curRoute = [0, cId];
-          curLoad = dem;
-        }
-      }
-      if (curRoute.length > 1) {
-        curRoute.push(0);
-        routes.push(curRoute);
-      }
-      return routes;
-    }
-
-    function evaluateIndividual(chrom) {
-      const routes = decodeRoutes(chrom);
-      let totalDist = 0;
-      let penalty = 0;
-
-      for (let r = 0; r < routes.length; r++) {
-        const route = routes[r];
-        let load = 0;
-        for (let i = 0; i < route.length - 1; i++) {
-          totalDist += DATA.dist_matrix[route[i]][route[i + 1]];
-          if (route[i] !== 0) {
-            const cust = DATA.customers.find(c => c.id === route[i]);
-            if (cust) load += cust.demand;
-          }
-        }
-        if (load > DATA.capacity) penalty += 500 * (load - DATA.capacity);
-      }
-
-      if (routes.length > DATA.fleet_limit) {
-        penalty += 5000 * (routes.length - DATA.fleet_limit);
-      }
-
-      const cost = totalDist + penalty;
-      const fit = 1.0 / (1.0 + cost);
-      return { totalDist, routes, fit };
-    }
-
-    function orderCrossover(p1, p2, pc) {
-      if (Math.random() > pc) return [p1.slice(), p2.slice()];
-      const n = p1.length;
-      let i = Math.floor(Math.random() * n);
-      let j = Math.floor(Math.random() * n);
-      if (i > j) [i, j] = [j, i];
-
-      function oxSingle(parentA, parentB) {
-        const child = new Array(n).fill(0);
-        const set = new Set();
-        for (let k = i; k <= j; k++) {
-          child[k] = parentA[k];
-          set.add(parentA[k]);
-        }
-        let pB = (j + 1) % n;
-        let cP = (j + 1) % n;
-        while (cP !== i) {
-          const cand = parentB[pB];
-          pB = (pB + 1) % n;
-          if (!set.has(cand)) {
-            child[cP] = cand;
-            cP = (cP + 1) % n;
-          }
-        }
-        return child;
-      }
-      return [oxSingle(p1, p2), oxSingle(p2, p1)];
-    }
-
-    function hybridMutate(chrom, pm) {
-      if (Math.random() > pm) return chrom;
-      const mut = chrom.slice();
-      const n = mut.length;
-      const i = Math.floor(Math.random() * n);
-      const j = Math.floor(Math.random() * n);
-
-      if (Math.random() < 0.5) {
-        [mut[i], mut[j]] = [mut[j], mut[i]];
-      } else {
-        const [start, end] = i < j ? [i, j] : [j, i];
-        const sub = mut.slice(start, end + 1).reverse();
-        for (let k = 0; k < sub.length; k++) mut[start + k] = sub[k];
-      }
-      return mut;
-    }
-
-    document.getElementById("btn-run-ga").addEventListener("click", () => {
-      const btn = document.getElementById("btn-run-ga");
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizing in Browser...';
-      btn.disabled = true;
-
-      const popSize = parseInt(document.getElementById("input-pop-size").value);
-      const pm = parseFloat(document.getElementById("input-mut-rate").value);
-      const pc = parseFloat(document.getElementById("select-crossover").value);
-      const maxGens = parseInt(document.getElementById("select-generations").value);
-      const selMethod = document.getElementById("select-selection").value;
-
+    // ============================================================
+    // CLIENT-SIDE GREEDY NEAREST NEIGHBOR SOLVER
+    // ============================================================
+    function solveGreedyNN(depot, customers, capacity, distMatrix) {
       const startTime = performance.now();
+      const unvisited = new Set(customers.map(c => c.id));
+      const demandMap = {};
+      customers.forEach(c => demandMap[c.id] = c.demand);
 
-      const customerIds = DATA.customers.map(c => c.id);
-      let population = [];
-      for (let p = 0; p < popSize; p++) {
-        const chrom = customerIds.slice().sort(() => Math.random() - 0.5);
-        population.push(chrom);
-      }
+      const routes = [];
+      const routeDemands = [];
+      const routeDistances = [];
 
-      let evals = population.map(evaluateIndividual);
-      let bestOverall = evals[0];
-      let convGen = 0;
+      while (unvisited.size > 0) {
+        const route = [0];
+        let currNode = 0;
+        let currCap = capacity;
+        let routeDist = 0;
+        let routeLoad = 0;
 
-      const history = { generation: [], best_distance: [], avg_distance: [] };
-      let currentGen = 0;
-      const CHUNK_SIZE = 5;
+        while (unvisited.size > 0) {
+          let bestCandidate = null;
+          let bestDist = Infinity;
 
-      function stepGenerations() {
-        const endGen = Math.min(maxGens, currentGen + CHUNK_SIZE);
-
-        for (let g = currentGen; g < endGen; g++) {
-          evals = population.map(evaluateIndividual);
-          let genBest = evals[0];
-          let sumDist = 0;
-
-          for (let e = 0; e < evals.length; e++) {
-            sumDist += evals[e].totalDist;
-            if (evals[e].fit > genBest.fit) genBest = evals[e];
-          }
-
-          if (genBest.fit > bestOverall.fit) {
-            bestOverall = genBest;
-            convGen = g;
-          }
-
-          history.generation.push(g);
-          history.best_distance.push(parseFloat(bestOverall.totalDist.toFixed(2)));
-          history.avg_distance.push(parseFloat((sumDist / popSize).toFixed(2)));
-
-          // Elitism: keep top 4%
-          const sortedPop = population.map((c, idx) => ({ c, fit: evals[idx].fit }))
-                                      .sort((a, b) => b.fit - a.fit);
-          const eliteCount = Math.max(1, Math.round(0.04 * popSize));
-          const nextPop = sortedPop.slice(0, eliteCount).map(item => item.c);
-
-          function selectParent() {
-            if (selMethod === "tournament") {
-              const k = 3;
-              let best = Math.floor(Math.random() * popSize);
-              for (let i = 1; i < k; i++) {
-                const cand = Math.floor(Math.random() * popSize);
-                if (evals[cand].fit > evals[best].fit) best = cand;
+          for (const candId of unvisited) {
+            const candDemand = demandMap[candId];
+            if (candDemand <= currCap) {
+              const d = distMatrix[currNode][candId];
+              if (d < bestDist) {
+                bestDist = d;
+                bestCandidate = candId;
               }
-              return population[best];
-            } else {
-              const totalFit = evals.reduce((acc, cur) => acc + cur.fit, 0);
-              let pick = Math.random() * totalFit;
-              for (let i = 0; i < popSize; i++) {
-                pick -= evals[i].fit;
-                if (pick <= 0) return population[i];
-              }
-              return population[popSize - 1];
             }
           }
 
-          while (nextPop.length < popSize) {
-            const p1 = selectParent();
-            const p2 = selectParent();
-            const [c1, c2] = orderCrossover(p1, p2, pc);
-            nextPop.push(hybridMutate(c1, pm));
-            if (nextPop.length < popSize) nextPop.push(hybridMutate(c2, pm));
+          if (bestCandidate !== null) {
+            route.push(bestCandidate);
+            routeDist += bestDist;
+            routeLoad += demandMap[bestCandidate];
+            currCap -= demandMap[bestCandidate];
+            unvisited.delete(bestCandidate);
+            currNode = bestCandidate;
+          } else {
+            break;
           }
-          population = nextPop;
         }
 
-        currentGen = endGen;
-        currentRoutes = bestOverall.routes;
-        drawMap();
+        route.push(0);
+        routeDist += distMatrix[currNode][0];
 
-        if (currentGen < maxGens) {
-          requestAnimationFrame(stepGenerations);
-        } else {
-          const elapsedSec = ((performance.now() - startTime) / 1000).toFixed(3);
-          const baseDist = DATA.baseline.total_distance_km;
-          const savingsDist = baseDist - bestOverall.totalDist;
-          const savingsPct = (savingsDist / baseDist) * 100;
-
-          const routeDemands = bestOverall.routes.map(r => r.reduce((acc, cId) => acc + (cId === 0 ? 0 : DATA.customers.find(c => c.id === cId).demand), 0));
-          const routeDists = bestOverall.routes.map(r => {
-            let d = 0;
-            for (let i = 0; i < r.length - 1; i++) d += DATA.dist_matrix[r[i]][r[i + 1]];
-            return parseFloat(d.toFixed(2));
-          });
-
-          updateMetrics(
-            baseDist,
-            bestOverall.totalDist,
-            bestOverall.routes.length,
-            savingsDist,
-            savingsPct,
-            elapsedSec,
-            "Client-Side Genetic Algorithm",
-            convGen
-          );
-
-          renderRouteCards(bestOverall.routes, routeDemands, routeDists);
-          updateTruckSelector();
-          updateChart(history);
-
-          btn.innerHTML = '<i class="fa-solid fa-dna"></i> Run Genetic Algorithm Live';
-          btn.disabled = false;
-        }
+        routes.push(route);
+        routeDemands.push(routeLoad);
+        routeDistances.push(parseFloat(routeDist.toFixed(2)));
       }
 
-      requestAnimationFrame(stepGenerations);
+      const totalDist = routeDistances.reduce((a, b) => a + b, 0);
+      const runtime = (performance.now() - startTime) / 1000;
+
+      return {
+        routes: routes,
+        route_demands: routeDemands,
+        route_distances_km: routeDistances,
+        total_distance_km: parseFloat(totalDist.toFixed(2)),
+        vehicles_utilized: routes.length,
+        runtime_seconds: parseFloat(runtime.toFixed(4))
+      };
+    }
+
+    // ============================================================
+    // CLIENT-SIDE GENETIC ALGORITHM ENGINE
+    // ============================================================
+    function solveClientGA(customers, capacity, fleetLimit, distMatrix, popSize, mutRate, crRate, maxGen) {
+      const startTime = performance.now();
+      const numCust = customers.length;
+      const custIds = customers.map(c => c.id);
+      const demandMap = {};
+      customers.forEach(c => demandMap[c.id] = c.demand);
+
+      function splitChromosome(perm) {
+        const rList = [];
+        let currRoute = [0];
+        let currLoad = 0;
+
+        for (let i = 0; i < perm.length; i++) {
+          const cid = perm[i];
+          const d = demandMap[cid];
+          if (currLoad + d <= capacity) {
+            currRoute.push(cid);
+            currLoad += d;
+          } else {
+            currRoute.push(0);
+            rList.push(currRoute);
+            currRoute = [0, cid];
+            currLoad = d;
+          }
+        }
+        if (currRoute.length > 1) {
+          currRoute.push(0);
+          rList.push(currRoute);
+        }
+        return rList;
+      }
+
+      function calcDist(rList) {
+        let tot = 0;
+        for (let r = 0; r < rList.length; r++) {
+          const route = rList[r];
+          for (let i = 0; i < route.length - 1; i++) {
+            tot += distMatrix[route[i]][route[i + 1]];
+          }
+        }
+        return tot;
+      }
+
+      function fitness(perm) {
+        const rList = splitChromosome(perm);
+        const dist = calcDist(rList);
+        const penalty = (rList.length > fleetLimit) ? (rList.length - fleetLimit) * 500 : 0;
+        return 1.0 / (dist + penalty + 1e-6);
+      }
+
+      // Initial Population
+      let population = [];
+      for (let p = 0; p < popSize; p++) {
+        const perm = [...custIds];
+        for (let i = perm.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [perm[i], perm[j]] = [perm[j], perm[i]];
+        }
+        population.push(perm);
+      }
+
+      let bestPerm = null;
+      let bestDistOverall = Infinity;
+      let bestFitOverall = -1;
+      let convergedGen = 1;
+
+      const histGen = [];
+      const histBest = [];
+      const histAvg = [];
+
+      for (let gen = 1; gen <= maxGen; gen++) {
+        const fitnesses = population.map(ind => fitness(ind));
+        const distances = population.map(ind => calcDist(splitChromosome(ind)));
+
+        for (let i = 0; i < population.length; i++) {
+          if (fitnesses[i] > bestFitOverall) {
+            bestFitOverall = fitnesses[i];
+            bestDistOverall = distances[i];
+            bestPerm = [...population[i]];
+            convergedGen = gen;
+          }
+        }
+
+        const avgDist = distances.reduce((a, b) => a + b, 0) / distances.length;
+        histGen.push(gen);
+        histBest.push(parseFloat(bestDistOverall.toFixed(2)));
+        histAvg.push(parseFloat(avgDist.toFixed(2)));
+
+        // Next generation
+        const newPop = [];
+        // Elitism (top 2)
+        const sortedIndices = fitnesses.map((f, i) => [f, i]).sort((a, b) => b[0] - a[0]);
+        newPop.push([...population[sortedIndices[0][1]]]);
+        newPop.push([...population[sortedIndices[1][1]]]);
+
+        while (newPop.length < popSize) {
+          // Tournament Selection (k=3)
+          function selectParent() {
+            let bestIdx = Math.floor(Math.random() * popSize);
+            for (let t = 0; t < 2; t++) {
+              const cand = Math.floor(Math.random() * popSize);
+              if (fitnesses[cand] > fitnesses[bestIdx]) bestIdx = cand;
+            }
+            return population[bestIdx];
+          }
+
+          const p1 = selectParent();
+          const p2 = selectParent();
+
+          let c1 = [...p1];
+          let c2 = [...p2];
+
+          // Order Crossover (OX1)
+          if (Math.random() < crRate && numCust > 2) {
+            let i1 = Math.floor(Math.random() * numCust);
+            let i2 = Math.floor(Math.random() * numCust);
+            if (i1 > i2) [i1, i2] = [i2, i1];
+
+            function ox1(pa, pb) {
+              const child = new Array(numCust).fill(null);
+              for (let k = i1; k <= i2; k++) child[k] = pa[k];
+              const segSet = new Set(child.slice(i1, i2 + 1));
+              let fillIdx = (i2 + 1) % numCust;
+              for (let k = 0; k < numCust; k++) {
+                const item = pb[(i2 + 1 + k) % numCust];
+                if (!segSet.has(item)) {
+                  child[fillIdx] = item;
+                  fillIdx = (fillIdx + 1) % numCust;
+                }
+              }
+              return child;
+            }
+
+            c1 = ox1(p1, p2);
+            c2 = ox1(p2, p1);
+          }
+
+          // 2-Opt Inversion Mutation
+          function mutate(ind) {
+            if (Math.random() < mutRate && numCust > 3) {
+              let i1 = Math.floor(Math.random() * numCust);
+              let i2 = Math.floor(Math.random() * numCust);
+              if (i1 > i2) [i1, i2] = [i2, i1];
+              const sub = ind.slice(i1, i2 + 1).reverse();
+              for (let k = 0; k < sub.length; k++) ind[i1 + k] = sub[k];
+            }
+            return ind;
+          }
+
+          newPop.push(mutate(c1));
+          if (newPop.length < popSize) newPop.push(mutate(c2));
+        }
+
+        population = newPop;
+      }
+
+      const finalRoutes = splitChromosome(bestPerm);
+      const finalDemands = finalRoutes.map(r => r.reduce((acc, nid) => acc + (demandMap[nid] || 0), 0));
+      const finalDistances = finalRoutes.map(r => {
+        let d = 0;
+        for (let i = 0; i < r.length - 1; i++) d += distMatrix[r[i]][r[i + 1]];
+        return parseFloat(d.toFixed(2));
+      });
+
+      const runtime = (performance.now() - startTime) / 1000;
+
+      return {
+        routes: finalRoutes,
+        route_demands: finalDemands,
+        route_distances_km: finalDistances,
+        total_distance_km: parseFloat(bestDistOverall.toFixed(2)),
+        vehicles_utilized: finalRoutes.length,
+        converged_generation: convergedGen,
+        runtime_seconds: parseFloat(runtime.toFixed(3)),
+        history: {
+          generation: histGen,
+          best_distance: histBest,
+          avg_distance: histAvg
+        }
+      };
+    }
+
+    // Run GA Trigger
+    document.getElementById("btn-run-ga").addEventListener("click", () => {
+      const popSize = parseInt(document.getElementById("input-pop-size").value);
+      const mutRate = parseFloat(document.getElementById("input-mut-rate").value);
+      const crRate = parseFloat(document.getElementById("select-cr-rate").value);
+      const maxGen = parseInt(document.getElementById("input-generations").value);
+
+      const btn = document.getElementById("btn-run-ga");
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Evolving Routes...';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        const gaRes = solveClientGA(
+          DATA.customers,
+          DATA.capacity,
+          DATA.fleet_limit,
+          DATA.dist_matrix,
+          popSize,
+          mutRate,
+          crRate,
+          maxGen
+        );
+
+        DATA.ga_best = gaRes;
+        currentRoutes = gaRes.routes;
+        currentView = "ga";
+        currentSolver = "Genetic Algorithm";
+
+        const baseDist = DATA.baseline.total_distance_km;
+        const gaDist = gaRes.total_distance_km;
+        const savingsDist = baseDist - gaDist;
+        const savingsPct = (savingsDist / baseDist) * 100;
+
+        updateMetrics(
+          baseDist,
+          gaDist,
+          gaRes.vehicles_utilized,
+          savingsDist,
+          savingsPct,
+          gaRes.runtime_seconds,
+          "Genetic Algorithm (Optimized)",
+          gaRes.converged_generation
+        );
+
+        renderRouteCards(gaRes.routes, gaRes.route_demands, gaRes.route_distances_km);
+        updateTruckSelector();
+        updateChart(gaRes.history);
+        drawMap();
+
+        btn.innerHTML = '<i class="fa-solid fa-dna"></i> Run Evolutionary Algorithm';
+        btn.disabled = false;
+        showToast(`Evolution complete! Total distance optimized to ${gaDist} km.`, "success");
+      }, 50);
     });
 
     // ============================================================
-    // USER INPUT: WAREHOUSE DISTANCE TABLE, TRUCKS & DELIVERY SITES
+    // MODAL & CUSTOM SITES / DIRECT WAREHOUSE DISTANCES LOGIC
     // ============================================================
     const modal = document.getElementById("modal-scenario");
-    document.getElementById("btn-open-scenario-modal").addEventListener("click", openScenarioModal);
-    document.getElementById("btn-quick-config").addEventListener("click", openScenarioModal);
-    document.getElementById("btn-close-modal").addEventListener("click", () => modal.classList.add("hidden"));
-    document.getElementById("btn-cancel-modal").addEventListener("click", () => modal.classList.add("hidden"));
-
-    let tempDepot = { x: 50.0, y: 50.0 };
-    let tempCustomers = [];
+    let tempCustomers = JSON.parse(JSON.stringify(DATA.customers));
+    let tempDepot = { ...DATA.depot };
 
     function openScenarioModal() {
-      tempDepot = { x: DATA.depot.x, y: DATA.depot.y };
-      tempCustomers = DATA.customers.map(c => {
-        const dx = c.x - tempDepot.x;
-        const dy = c.y - tempDepot.y;
-        let dist = Math.sqrt(dx * dx + dy * dy);
-        let angle = Math.round((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360);
-        return {
-          id: c.id,
-          x: c.x,
-          y: c.y,
-          distToDepot: parseFloat(dist.toFixed(1)),
-          angle: angle,
-          demand: c.demand
-        };
-      });
-
+      tempCustomers = JSON.parse(JSON.stringify(DATA.customers));
+      tempDepot = { ...DATA.depot };
       document.getElementById("input-depot-x").value = tempDepot.x;
       document.getElementById("input-depot-y").value = tempDepot.y;
       document.getElementById("input-fleet-limit").value = DATA.fleet_limit;
       document.getElementById("input-truck-capacity").value = DATA.capacity;
       document.getElementById("input-num-sites").value = tempCustomers.length;
-
       renderCustomSitesTable();
       modal.classList.remove("hidden");
     }
 
+    document.getElementById("btn-open-scenario-modal").addEventListener("click", openScenarioModal);
+    document.getElementById("btn-quick-config").addEventListener("click", openScenarioModal);
+    document.getElementById("btn-close-modal").addEventListener("click", () => modal.classList.add("hidden"));
+    document.getElementById("btn-cancel-scenario").addEventListener("click", () => modal.classList.add("hidden"));
+
     function renderCustomSitesTable() {
       const tbody = document.getElementById("custom-sites-tbody");
       tbody.innerHTML = "";
-
-      let totalDemand = 0;
+      const totalDemand = tempCustomers.reduce((acc, c) => acc + c.demand, 0);
+      document.getElementById("custom-sites-count").textContent = 
+        `${tempCustomers.length} Sites Configured | Total Demand: ${totalDemand} units`;
 
       tempCustomers.forEach((cust, idx) => {
-        cust.id = idx + 1; // 1..N order
-        totalDemand += cust.demand;
-
         const tr = document.createElement("tr");
-        tr.className = "hover:bg-slate-800/60";
+        tr.className = "hover:bg-slate-800/50 transition";
         tr.innerHTML = `
-          <td class="p-2.5 text-center font-bold text-white">${cust.id}</td>
-          
-          <!-- PRIMARY USER INPUT: Distance from Warehouse (km) -->
-          <td class="p-2.5 bg-emerald-950/30 border-l border-r border-emerald-500/20">
+          <td class="p-2.5 font-bold font-mono text-indigo-400">#${cust.id}</td>
+          <td class="p-2.5">
             <div class="flex items-center space-x-1">
               <input type="number" step="0.5" min="1" max="150" value="${cust.distToDepot}" 
                      class="inp-warehouse-dist w-28 bg-slate-900 border-2 border-emerald-500 rounded px-2 py-1 text-xs text-emerald-300 font-bold font-mono outline-none focus:border-emerald-400" 
@@ -1168,39 +1481,31 @@ html_template = """<!DOCTYPE html>
               <span class="text-emerald-400 font-semibold text-xs">km</span>
             </div>
           </td>
-
-          <!-- Angle / Direction (°) -->
           <td class="p-2.5">
             <div class="flex items-center space-x-1">
-              <input type="number" step="5" min="0" max="360" value="${cust.angle}" 
-                     class="inp-angle w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-200 font-mono" 
+              <input type="number" step="1" min="0" max="359" value="${cust.angle}" 
+                     class="inp-angle w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200 font-mono outline-none" 
                      data-idx="${idx}">
-              <span class="text-slate-400 text-xs">°</span>
+              <span class="text-slate-500 text-xs">&deg;</span>
             </div>
           </td>
-
-          <!-- Coordinates X, Y (Auto-calculated from distance + angle, or editable) -->
-          <td class="p-2.5 text-slate-300">
-            <div class="flex items-center space-x-1">
-              <span class="text-slate-500 text-[11px]">X:</span>
-              <input type="number" step="0.5" value="${cust.x.toFixed(1)}" class="inp-coord-x w-16 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-xs text-slate-300 font-mono" data-idx="${idx}">
-              <span class="text-slate-500 text-[11px] ml-1">Y:</span>
-              <input type="number" step="0.5" value="${cust.y.toFixed(1)}" class="inp-coord-y w-16 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-xs text-slate-300 font-mono" data-idx="${idx}">
-            </div>
-          </td>
-
-          <!-- Demand (units) -->
           <td class="p-2.5">
-            <div class="flex items-center space-x-1">
-              <input type="number" min="1" max="100" value="${cust.demand}" 
-                     class="inp-demand w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white font-mono" 
-                     data-idx="${idx}">
-              <span class="text-slate-400 text-xs">u</span>
-            </div>
+            <input type="number" step="0.5" min="0" max="100" value="${cust.x.toFixed(1)}" 
+                   class="inp-coord-x w-16 bg-slate-900/60 border border-slate-700/80 rounded px-1.5 py-1 text-xs text-slate-300 font-mono outline-none" 
+                   data-idx="${idx}">
           </td>
-
+          <td class="p-2.5">
+            <input type="number" step="0.5" min="0" max="100" value="${cust.y.toFixed(1)}" 
+                   class="inp-coord-y w-16 bg-slate-900/60 border border-slate-700/80 rounded px-1.5 py-1 text-xs text-slate-300 font-mono outline-none" 
+                   data-idx="${idx}">
+          </td>
+          <td class="p-2.5">
+            <input type="number" min="1" max="100" value="${cust.demand}" 
+                   class="inp-demand w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-white font-mono outline-none" 
+                   data-idx="${idx}">
+          </td>
           <td class="p-2.5 text-center">
-            <button class="btn-del-site text-red-400 hover:text-red-300 p-1 cursor-pointer" data-idx="${idx}" title="Remove this site">
+            <button class="btn-del-site text-red-400 hover:text-red-300 transition text-xs p-1" data-idx="${idx}" title="Delete site">
               <i class="fa-solid fa-trash"></i>
             </button>
           </td>
@@ -1208,22 +1513,17 @@ html_template = """<!DOCTYPE html>
         tbody.appendChild(tr);
       });
 
-      document.getElementById("custom-sites-count").textContent = 
-        `${tempCustomers.length} Sites Configured | Total Demand: ${totalDemand} units`;
-
-      // 1. PRIMARY: User edits Distance from Warehouse directly!
+      // 1. PRIMARY: User edits Distance from Warehouse directly
       tbody.querySelectorAll(".inp-warehouse-dist").forEach(inp => {
         inp.addEventListener("input", e => {
           const idx = parseInt(e.target.dataset.idx);
           const newDist = Math.max(1, parseFloat(e.target.value) || 1);
           tempCustomers[idx].distToDepot = newDist;
           
-          // Recompute coordinates (X, Y) from Distance and Angle
           const rad = tempCustomers[idx].angle * Math.PI / 180;
           tempCustomers[idx].x = parseFloat((tempDepot.x + newDist * Math.cos(rad)).toFixed(1));
           tempCustomers[idx].y = parseFloat((tempDepot.y + newDist * Math.sin(rad)).toFixed(1));
 
-          // Update X, Y input boxes in the table
           const tr = e.target.closest("tr");
           tr.querySelector(".inp-coord-x").value = tempCustomers[idx].x.toFixed(1);
           tr.querySelector(".inp-coord-y").value = tempCustomers[idx].y.toFixed(1);
@@ -1248,24 +1548,8 @@ html_template = """<!DOCTYPE html>
         });
       });
 
-      // 3. User edits X or Y coordinates directly
-      tbody.querySelectorAll(".inp-coord-x").forEach(inp => {
-        inp.addEventListener("input", e => {
-          const idx = parseInt(e.target.dataset.idx);
-          tempCustomers[idx].x = parseFloat(e.target.value) || 0;
-          syncDistFromCoords(idx, e.target.closest("tr"));
-        });
-      });
-
-      tbody.querySelectorAll(".inp-coord-y").forEach(inp => {
-        inp.addEventListener("input", e => {
-          const idx = parseInt(e.target.dataset.idx);
-          tempCustomers[idx].y = parseFloat(e.target.value) || 0;
-          syncDistFromCoords(idx, e.target.closest("tr"));
-        });
-      });
-
-      function syncDistFromCoords(idx, tr) {
+      // 3. User edits Coordinates directly
+      function syncFromCoords(idx, tr) {
         const dx = tempCustomers[idx].x - tempDepot.x;
         const dy = tempCustomers[idx].y - tempDepot.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1276,99 +1560,101 @@ html_template = """<!DOCTYPE html>
         tr.querySelector(".inp-angle").value = angle;
       }
 
-      // 4. User edits demand
+      tbody.querySelectorAll(".inp-coord-x").forEach(inp => {
+        inp.addEventListener("input", e => {
+          const idx = parseInt(e.target.dataset.idx);
+          tempCustomers[idx].x = parseFloat(e.target.value) || 0;
+          syncFromCoords(idx, e.target.closest("tr"));
+        });
+      });
+
+      tbody.querySelectorAll(".inp-coord-y").forEach(inp => {
+        inp.addEventListener("input", e => {
+          const idx = parseInt(e.target.dataset.idx);
+          tempCustomers[idx].y = parseFloat(e.target.value) || 0;
+          syncFromCoords(idx, e.target.closest("tr"));
+        });
+      });
+
+      // 4. User edits Demand
       tbody.querySelectorAll(".inp-demand").forEach(inp => {
         inp.addEventListener("input", e => {
           const idx = parseInt(e.target.dataset.idx);
-          tempCustomers[idx].demand = parseInt(e.target.value) || 10;
+          tempCustomers[idx].demand = parseInt(e.target.value) || 1;
           const sum = tempCustomers.reduce((acc, c) => acc + c.demand, 0);
           document.getElementById("custom-sites-count").textContent = `${tempCustomers.length} Sites Configured | Total Demand: ${sum} units`;
         });
       });
 
-      // 5. Delete button
+      // 5. Delete site
       tbody.querySelectorAll(".btn-del-site").forEach(btn => {
         btn.addEventListener("click", e => {
-          const idx = parseInt(btn.dataset.idx);
           if (tempCustomers.length <= 3) {
             alert("A minimum of 3 delivery sites is required.");
             return;
           }
+          const idx = parseInt(btn.dataset.idx);
           tempCustomers.splice(idx, 1);
+          tempCustomers.forEach((c, i) => c.id = i + 1);
+          document.getElementById("input-num-sites").value = tempCustomers.length;
           renderCustomSitesTable();
         });
       });
     }
 
-    // Warehouse coordinate change
-    document.getElementById("input-depot-x").addEventListener("input", e => {
-      tempDepot.x = parseFloat(e.target.value) || 0;
-      tempCustomers.forEach(c => {
-        const rad = c.angle * Math.PI / 180;
-        c.x = parseFloat((tempDepot.x + c.distToDepot * Math.cos(rad)).toFixed(1));
-        c.y = parseFloat((tempDepot.y + c.distToDepot * Math.sin(rad)).toFixed(1));
-      });
-      renderCustomSitesTable();
-    });
-    document.getElementById("input-depot-y").addEventListener("input", e => {
-      tempDepot.y = parseFloat(e.target.value) || 0;
-      tempCustomers.forEach(c => {
-        const rad = c.angle * Math.PI / 180;
-        c.x = parseFloat((tempDepot.x + c.distToDepot * Math.cos(rad)).toFixed(1));
-        c.y = parseFloat((tempDepot.y + c.distToDepot * Math.sin(rad)).toFixed(1));
-      });
-      renderCustomSitesTable();
-    });
-
     // Bulk Apply Distances
     document.getElementById("btn-apply-bulk-dist").addEventListener("click", () => {
       const raw = document.getElementById("input-bulk-distances").value.trim();
       if (!raw) return;
-      const parsed = raw.split(/[,\\s]+/).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-      if (parsed.length === 0) return;
+      const dists = raw.split(/[,;\s]+/).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+      if (dists.length === 0) return;
 
-      parsed.forEach((d, i) => {
-        if (i < tempCustomers.length) {
-          tempCustomers[i].distToDepot = d;
-          const rad = tempCustomers[i].angle * Math.PI / 180;
-          tempCustomers[i].x = parseFloat((tempDepot.x + d * Math.cos(rad)).toFixed(1));
-          tempCustomers[i].y = parseFloat((tempDepot.y + d * Math.sin(rad)).toFixed(1));
-        }
-      });
-      renderCustomSitesTable();
-    });
-
-    // Set Site Count Directly
-    document.getElementById("btn-update-num-sites").addEventListener("click", () => {
-      const count = Math.max(3, Math.min(50, parseInt(document.getElementById("input-num-sites").value) || 15));
-      if (count > tempCustomers.length) {
-        while (tempCustomers.length < count) {
-          const i = tempCustomers.length + 1;
-          const dist = parseFloat((Math.random() * 38 + 8).toFixed(1)); // 8..46 km
-          const angle = Math.round((i * (360 / count)) % 360);
-          const rad = angle * Math.PI / 180;
-          tempCustomers.push({
-            id: i,
-            distToDepot: dist,
-            angle: angle,
-            x: parseFloat((tempDepot.x + dist * Math.cos(rad)).toFixed(1)),
-            y: parseFloat((tempDepot.y + dist * Math.sin(rad)).toFixed(1)),
-            demand: Math.floor(Math.random() * 16 + 10)
-          });
-        }
-      } else if (count < tempCustomers.length) {
-        tempCustomers = tempCustomers.slice(0, count);
+      for (let i = 0; i < tempCustomers.length; i++) {
+        const d = dists[i % dists.length];
+        tempCustomers[i].distToDepot = parseFloat(d.toFixed(1));
+        const rad = tempCustomers[i].angle * Math.PI / 180;
+        tempCustomers[i].x = parseFloat((tempDepot.x + d * Math.cos(rad)).toFixed(1));
+        tempCustomers[i].y = parseFloat((tempDepot.y + d * Math.sin(rad)).toFixed(1));
       }
       renderCustomSitesTable();
+      showToast(`Applied bulk distances to all ${tempCustomers.length} delivery sites.`, "success");
     });
 
-    // Generate Random Sites
+    // Change Site Count
+    document.getElementById("btn-update-num-sites").addEventListener("click", () => {
+      const targetCount = parseInt(document.getElementById("input-num-sites").value);
+      if (targetCount < 3 || targetCount > 60) {
+        alert("Please choose between 3 and 60 delivery sites.");
+        return;
+      }
+      while (tempCustomers.length < targetCount) {
+        const newId = tempCustomers.length + 1;
+        const angle = (newId * 37) % 360;
+        const dist = 15.0 + ((newId * 7) % 35);
+        const rad = angle * Math.PI / 180;
+        tempCustomers.push({
+          id: newId,
+          distToDepot: parseFloat(dist.toFixed(1)),
+          angle: angle,
+          x: parseFloat((tempDepot.x + dist * Math.cos(rad)).toFixed(1)),
+          y: parseFloat((tempDepot.y + dist * Math.sin(rad)).toFixed(1)),
+          demand: 10 + (newId % 16)
+        });
+      }
+      if (tempCustomers.length > targetCount) {
+        tempCustomers = tempCustomers.slice(0, targetCount);
+      }
+      tempCustomers.forEach((c, i) => c.id = i + 1);
+      renderCustomSitesTable();
+    });
+
+    // Randomize Sites
     document.getElementById("btn-generate-random").addEventListener("click", () => {
-      const n = Math.max(5, Math.min(50, parseInt(document.getElementById("input-num-sites").value) || 20));
+      const n = tempCustomers.length;
       tempCustomers = [];
       for (let i = 1; i <= n; i++) {
-        const dist = parseFloat((Math.random() * 40 + 6).toFixed(1)); // 6..46 km from warehouse
-        const angle = Math.round((Math.random() * 360));
+        const dist = parseFloat((Math.random() * 40 + 8).toFixed(1));
+        const angle = Math.floor(Math.random() * 360);
         const rad = angle * Math.PI / 180;
         tempCustomers.push({
           id: i,
@@ -1376,7 +1662,7 @@ html_template = """<!DOCTYPE html>
           angle: angle,
           x: parseFloat((tempDepot.x + dist * Math.cos(rad)).toFixed(1)),
           y: parseFloat((tempDepot.y + dist * Math.sin(rad)).toFixed(1)),
-          demand: Math.floor(Math.random() * 16 + 10) // 10..25 units
+          demand: Math.floor(Math.random() * 16 + 10)
         });
       }
       renderCustomSitesTable();
@@ -1405,10 +1691,10 @@ html_template = """<!DOCTYPE html>
       renderCustomSitesTable();
     });
 
-    // Add Single Delivery Site
+    // Add Single Site
     document.getElementById("btn-add-single-site").addEventListener("click", () => {
-      if (tempCustomers.length >= 50) {
-        alert("Maximum limit of 50 delivery sites reached.");
+      if (tempCustomers.length >= 60) {
+        alert("Maximum 60 delivery sites supported in simulation.");
         return;
       }
       const newId = tempCustomers.length + 1;
@@ -1427,73 +1713,7 @@ html_template = """<!DOCTYPE html>
       renderCustomSitesTable();
     });
 
-    // Pure JS Greedy Nearest-Neighbor CVRP Solver
-    function solveGreedyNN(depot, customers, capacity, distMatrix) {
-      const unvisited = new Set(customers.map(c => c.id));
-      const routes = [];
-      const routeDemands = [];
-      const routeDistances = [];
-      let totalDist = 0;
-
-      while (unvisited.size > 0) {
-        let currentRoute = [0];
-        let currentNode = 0;
-        let remainingCap = capacity;
-
-        while (true) {
-          const feasible = [];
-          unvisited.forEach(cId => {
-            const cust = customers.find(c => c.id === cId);
-            if (cust && cust.demand <= remainingCap) feasible.push(cId);
-          });
-
-          if (feasible.length === 0) break;
-
-          let bestNext = feasible[0];
-          let bestD = distMatrix[currentNode][bestNext];
-          for (let i = 1; i < feasible.length; i++) {
-            const cand = feasible[i];
-            const d = distMatrix[currentNode][cand];
-            if (d < bestD) {
-              bestD = d;
-              bestNext = cand;
-            }
-          }
-
-          currentRoute.push(bestNext);
-          const cust = customers.find(c => c.id === bestNext);
-          remainingCap -= cust.demand;
-          currentNode = bestNext;
-          unvisited.delete(bestNext);
-        }
-
-        currentRoute.push(0);
-        routes.push(currentRoute);
-
-        let rDist = 0;
-        let rDem = 0;
-        for (let i = 0; i < currentRoute.length - 1; i++) {
-          rDist += distMatrix[currentRoute[i]][currentRoute[i + 1]];
-          if (currentRoute[i] !== 0) {
-            rDem += customers.find(c => c.id === currentRoute[i]).demand;
-          }
-        }
-        routeDemands.push(rDem);
-        routeDistances.push(parseFloat(rDist.toFixed(2)));
-        totalDist += rDist;
-      }
-
-      return {
-        routes,
-        route_demands: routeDemands,
-        route_distances_km: routeDistances,
-        total_distance_km: parseFloat(totalDist.toFixed(2)),
-        vehicles_utilized: routes.length,
-        runtime_seconds: 0.001
-      };
-    }
-
-    // Apply User Inputs (Distances, Trucks, Sites) & Recalculate
+    // Apply User Inputs & Recalculate
     document.getElementById("btn-apply-scenario").addEventListener("click", () => {
       DATA.depot = { x: parseFloat(document.getElementById("input-depot-x").value) || 50, y: parseFloat(document.getElementById("input-depot-y").value) || 50 };
       DATA.fleet_limit = parseInt(document.getElementById("input-fleet-limit").value) || 8;
@@ -1501,8 +1721,7 @@ html_template = """<!DOCTYPE html>
       DATA.customers = JSON.parse(JSON.stringify(tempCustomers));
       DATA.total_demand = DATA.customers.reduce((acc, c) => acc + c.demand, 0);
 
-      // Recompute Distance Matrix: (N+1) x (N+1)
-      // Exactly respect user-entered distToDepot for edge between depot (0) and site (i)
+      // Recompute Distance Matrix: Exactly respect user-specified distToDepot!
       const numNodes = DATA.customers.length + 1;
       const allNodes = [{ id: 0, x: DATA.depot.x, y: DATA.depot.y }, ...DATA.customers];
       const newDistMatrix = [];
@@ -1513,13 +1732,10 @@ html_template = """<!DOCTYPE html>
           if (i === j) {
             row.push(0);
           } else if (i === 0 && j > 0) {
-            // Warehouse -> Site j: EXACT user-specified distance!
             row.push(DATA.customers[j - 1].distToDepot);
           } else if (j === 0 && i > 0) {
-            // Site i -> Warehouse: EXACT user-specified distance!
             row.push(DATA.customers[i - 1].distToDepot);
           } else {
-            // Site i -> Site j
             const dx = allNodes[i].x - allNodes[j].x;
             const dy = allNodes[i].y - allNodes[j].y;
             row.push(Math.sqrt(dx * dx + dy * dy));
@@ -1533,12 +1749,11 @@ html_template = """<!DOCTYPE html>
       DATA.baseline = solveGreedyNN(DATA.depot, DATA.customers, DATA.capacity, DATA.dist_matrix);
       DATA.ga_best = DATA.baseline;
 
-      // Update Header Badges
+      // Update Badges
       document.getElementById("badge-sites").innerHTML = `<i class="fa-solid fa-location-dot text-indigo-400 mr-1.5"></i>${DATA.customers.length} Delivery Sites`;
       document.getElementById("badge-depot").innerHTML = `<i class="fa-solid fa-warehouse text-amber-400 mr-1.5"></i>Warehouse (${DATA.depot.x.toFixed(0)}, ${DATA.depot.y.toFixed(0)})`;
       document.getElementById("badge-capacity").innerHTML = `<i class="fa-solid fa-box text-cyan-400 mr-1.5"></i>Capacity Q = ${DATA.capacity}`;
       document.getElementById("badge-trucks").innerHTML = `<i class="fa-solid fa-truck text-emerald-400 mr-1.5"></i>Fleet Limit K = ${DATA.fleet_limit}`;
-      document.getElementById("badge-demand").innerHTML = `<i class="fa-solid fa-weight-hanging text-purple-400 mr-1.5"></i>Demand: ${DATA.total_demand} u`;
 
       currentRoutes = DATA.baseline.routes;
       currentView = "baseline";
@@ -1560,7 +1775,333 @@ html_template = """<!DOCTYPE html>
       drawMap();
 
       modal.classList.add("hidden");
+      showToast(`Loaded ${DATA.customers.length} sites with custom warehouse distances!`, "success");
     });
+
+    // ============================================================
+    // WORKSPACE SAVE & RESTORE (LOCALSTORAGE + EXPORT JSON + BACKEND)
+    // ============================================================
+    const saveModal = document.getElementById("modal-save-load");
+    document.getElementById("btn-open-save-modal").addEventListener("click", () => {
+      const now = new Date();
+      const defaultName = `CVRP-Plan-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+      document.getElementById("input-save-name").value = defaultName;
+      refreshSavedItemsList();
+      saveModal.classList.remove("hidden");
+    });
+
+    document.getElementById("btn-close-save-modal").addEventListener("click", () => saveModal.classList.add("hidden"));
+    document.getElementById("btn-done-save-modal").addEventListener("click", () => saveModal.classList.add("hidden"));
+
+    function buildWorkspacePayload() {
+      const name = document.getElementById("input-save-name").value.trim() || "CVRP-Workspace";
+      return {
+        scenario_name: name,
+        saved_at: new Date().toISOString(),
+        depot: DATA.depot,
+        customers: DATA.customers,
+        capacity: DATA.capacity,
+        fleet_limit: DATA.fleet_limit,
+        total_demand: DATA.total_demand,
+        dist_matrix: DATA.dist_matrix,
+        routes: currentRoutes,
+        solver: currentSolver,
+        baseline: DATA.baseline,
+        ga_best: DATA.ga_best,
+        history: chartInstance ? {
+          generation: chartInstance.data.labels,
+          best_distance: chartInstance.data.datasets[0].data,
+          avg_distance: chartInstance.data.datasets[1].data
+        } : null
+      };
+    }
+
+    function applyLoadedWorkspace(loaded) {
+      if (!loaded || !loaded.customers || !loaded.depot) {
+        showToast("Invalid scenario data format.", "error");
+        return;
+      }
+      DATA.depot = loaded.depot;
+      DATA.customers = loaded.customers;
+      DATA.capacity = loaded.capacity || 100;
+      DATA.fleet_limit = loaded.fleet_limit || 8;
+      DATA.total_demand = loaded.total_demand || DATA.customers.reduce((a, c) => a + c.demand, 0);
+      DATA.dist_matrix = loaded.dist_matrix;
+      DATA.baseline = loaded.baseline || solveGreedyNN(DATA.depot, DATA.customers, DATA.capacity, DATA.dist_matrix);
+      DATA.ga_best = loaded.ga_best || DATA.baseline;
+
+      currentRoutes = loaded.routes || DATA.ga_best.routes;
+      currentSolver = loaded.solver || "Restored Plan";
+      currentView = "ga";
+      selectedTruck = "all";
+
+      // Badges
+      document.getElementById("badge-sites").innerHTML = `<i class="fa-solid fa-location-dot text-indigo-400 mr-1.5"></i>${DATA.customers.length} Delivery Sites`;
+      document.getElementById("badge-depot").innerHTML = `<i class="fa-solid fa-warehouse text-amber-400 mr-1.5"></i>Warehouse (${DATA.depot.x.toFixed(0)}, ${DATA.depot.y.toFixed(0)})`;
+      document.getElementById("badge-capacity").innerHTML = `<i class="fa-solid fa-box text-cyan-400 mr-1.5"></i>Capacity Q = ${DATA.capacity}`;
+      document.getElementById("badge-trucks").innerHTML = `<i class="fa-solid fa-truck text-emerald-400 mr-1.5"></i>Fleet Limit K = ${DATA.fleet_limit}`;
+
+      const baseDist = DATA.baseline.total_distance_km;
+      const curDist = DATA.ga_best.total_distance_km || baseDist;
+      const savDist = baseDist - curDist;
+      const savPct = baseDist > 0 ? (savDist / baseDist) * 100 : 0;
+
+      updateMetrics(
+        baseDist,
+        curDist,
+        currentRoutes.length,
+        savDist,
+        savPct,
+        DATA.ga_best.runtime_seconds || 0,
+        currentSolver,
+        DATA.ga_best.converged_generation || "N/A"
+      );
+
+      const demands = currentRoutes.map(r => r.reduce((a, nid) => {
+        const c = DATA.customers.find(item => item.id === nid);
+        return a + (c ? c.demand : 0);
+      }, 0));
+
+      const distances = currentRoutes.map(r => {
+        let d = 0;
+        for (let i = 0; i < r.length - 1; i++) d += DATA.dist_matrix[r[i]][r[i + 1]];
+        return parseFloat(d.toFixed(2));
+      });
+
+      renderRouteCards(currentRoutes, demands, distances);
+      updateTruckSelector();
+      if (loaded.history) updateChart(loaded.history);
+      drawMap();
+
+      saveModal.classList.add("hidden");
+      showToast(`Successfully restored workspace "${loaded.scenario_name || 'Plan'}"!`, "success");
+    }
+
+    // 1. Export JSON File to PC
+    document.getElementById("btn-action-export-json").addEventListener("click", () => {
+      const payload = buildWorkspacePayload();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${payload.scenario_name}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Workspace exported as JSON file!", "success");
+    });
+
+    // 2. Save to Browser LocalStorage
+    document.getElementById("btn-action-save-browser").addEventListener("click", () => {
+      const payload = buildWorkspacePayload();
+      const key = "cvrp_workspaces";
+      let list = [];
+      try {
+        list = JSON.parse(localStorage.getItem(key)) || [];
+      } catch(e) { list = []; }
+      
+      list = list.filter(item => item.scenario_name !== payload.scenario_name);
+      list.unshift(payload);
+      if (list.length > 15) list = list.slice(0, 15);
+      localStorage.setItem(key, JSON.stringify(list));
+
+      refreshSavedItemsList();
+      showToast(`Saved "${payload.scenario_name}" to browser storage!`, "success");
+    });
+
+    // 3. Save to Backend Server Disk
+    document.getElementById("btn-action-save-backend").addEventListener("click", async () => {
+      const payload = buildWorkspacePayload();
+      const btn = document.getElementById("btn-action-save-backend");
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving to Server...';
+
+      try {
+        const resp = await fetch("/api/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const res = await resp.json();
+        if (res.status === "success") {
+          showToast(res.message, "success");
+          refreshSavedItemsList();
+        } else {
+          showToast(res.message || "Server save failed.", "error");
+        }
+      } catch (err) {
+        showToast("Backend server offline (saved to browser instead).", "info");
+        document.getElementById("btn-action-save-browser").click();
+      } finally {
+        btn.innerHTML = '<i class="fa-solid fa-server"></i> Save to Backend Disk';
+      }
+    });
+
+    // Import from JSON File
+    const fileInput = document.getElementById("file-import-input");
+    document.getElementById("btn-trigger-file-import").addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById("file-import-status").textContent = file.name;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          applyLoadedWorkspace(parsed);
+        } catch (err) {
+          showToast("Failed to parse JSON file.", "error");
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Refresh Saved Items List
+    async function refreshSavedItemsList() {
+      const tbody = document.getElementById("saved-items-tbody");
+      tbody.innerHTML = "";
+
+      let browserItems = [];
+      try {
+        browserItems = JSON.parse(localStorage.getItem("cvrp_workspaces")) || [];
+      } catch(e) { browserItems = []; }
+
+      let backendItems = [];
+      try {
+        const resp = await fetch("/api/saved-items");
+        if (resp.ok) {
+          const res = await resp.json();
+          if (res.status === "success") backendItems = res.items || [];
+        }
+      } catch(e) {}
+
+      if (browserItems.length === 0 && backendItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500 italic">No saved workspaces found. Save one above!</td></tr>';
+        return;
+      }
+
+      // Render Browser Items
+      browserItems.forEach((item, bIdx) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/50 transition";
+        const dateStr = item.saved_at ? new Date(item.saved_at).toLocaleDateString() + " " + new Date(item.saved_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "Recent";
+        const dist = item.ga_best ? item.ga_best.total_distance_km : (item.baseline ? item.baseline.total_distance_km : "N/A");
+        tr.innerHTML = `
+          <td class="p-2 font-bold text-white font-mono">${item.scenario_name}</td>
+          <td class="p-2"><span class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[10px]">Browser Cache</span></td>
+          <td class="p-2">${item.customers.length} sites</td>
+          <td class="p-2 text-emerald-400 font-mono">${dist} km</td>
+          <td class="p-2 text-slate-400 text-[10px]">${dateStr}</td>
+          <td class="p-2 text-center space-x-1">
+            <button class="btn-load-browser bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white px-2 py-1 rounded text-[11px] transition cursor-pointer" data-idx="${bIdx}">
+              Load
+            </button>
+            <button class="btn-del-browser text-red-400 hover:text-red-300 p-1 text-[11px] transition cursor-pointer" data-idx="${bIdx}">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Render Backend Items
+      backendItems.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/50 transition";
+        const dateStr = item.saved_at ? new Date(item.saved_at).toLocaleDateString() + " " + new Date(item.saved_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "Server";
+        tr.innerHTML = `
+          <td class="p-2 font-bold text-white font-mono">${item.scenario_name}</td>
+          <td class="p-2"><span class="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded text-[10px]">Server Disk</span></td>
+          <td class="p-2">${item.num_sites} sites</td>
+          <td class="p-2 text-emerald-400 font-mono">${item.total_distance} km</td>
+          <td class="p-2 text-slate-400 text-[10px]">${dateStr}</td>
+          <td class="p-2 text-center space-x-1">
+            <button class="btn-load-backend bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-white px-2 py-1 rounded text-[11px] transition cursor-pointer" data-filename="${item.filename}">
+              Load
+            </button>
+            <button class="btn-del-backend text-red-400 hover:text-red-300 p-1 text-[11px] transition cursor-pointer" data-filename="${item.filename}">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Attach Listeners
+      tbody.querySelectorAll(".btn-load-browser").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.idx);
+          applyLoadedWorkspace(browserItems[idx]);
+        });
+      });
+
+      tbody.querySelectorAll(".btn-del-browser").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.idx);
+          browserItems.splice(idx, 1);
+          localStorage.setItem("cvrp_workspaces", JSON.stringify(browserItems));
+          refreshSavedItemsList();
+        });
+      });
+
+      tbody.querySelectorAll(".btn-load-backend").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const fn = btn.dataset.filename;
+          try {
+            const resp = await fetch(`/api/load/${fn}`);
+            const res = await resp.json();
+            if (res.status === "success") {
+              applyLoadedWorkspace(res.data);
+            } else {
+              showToast(res.message, "error");
+            }
+          } catch(e) {
+            showToast("Failed to load from server.", "error");
+          }
+        });
+      });
+
+      tbody.querySelectorAll(".btn-del-backend").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const fn = btn.dataset.filename;
+          try {
+            const resp = await fetch(`/api/delete/${fn}`, { method: "POST" });
+            const res = await resp.json();
+            if (res.status === "success") {
+              refreshSavedItemsList();
+              showToast("Scenario deleted from server.", "success");
+            }
+          } catch(e) {}
+        });
+      });
+    }
+
+    document.getElementById("btn-refresh-saved-list").addEventListener("click", refreshSavedItemsList);
+
+    // Initial Load
+    function loadGlobalBest() {
+      const base = DATA.baseline;
+      const ga = DATA.ga_best;
+      const savDist = base.total_distance_km - ga.total_distance_km;
+      const savPct = (savDist / base.total_distance_km) * 100;
+
+      updateMetrics(
+        base.total_distance_km,
+        ga.total_distance_km,
+        ga.vehicles_utilized,
+        savDist,
+        savPct,
+        ga.runtime_seconds,
+        "Optimal Discovered Solution",
+        ga.converged_generation
+      );
+
+      renderRouteCards(ga.routes, ga.route_demands, ga.route_distances_km);
+      updateTruckSelector();
+      updateChart(ga.history);
+      animate();
+    }
 
     window.addEventListener("load", () => {
       initChart();
@@ -1579,4 +2120,4 @@ with open(root / "index.html", "w", encoding="utf-8") as f:
 with open(root / "templates" / "index.html", "w", encoding="utf-8") as f:
     f.write(final_html)
 
-print("index.html compiled successfully with direct user input for distance from warehouse!")
+print("index.html compiled successfully with Zoom/Pan controls, Save/Load workspace, and user warehouse distances!")
